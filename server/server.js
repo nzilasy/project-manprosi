@@ -4,15 +4,23 @@ require('dotenv').config();
 
 const sequelize = require('./config/db');
 const { Role } = require('./models/index');
+
 const authRoutes = require('./routes/authRoutes');
+
+const { logger } = require('./middleware/loggerMiddleware');
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 const app = express();
 
+// Middleware global
 app.use(cors());
 app.use(express.json());
+app.use(logger);
 
+// Routes
 app.use('/api/auth', authRoutes);
 
+// Rute tes dasar
 app.get('/', (req, res) => {
   res.send('API Server MANPROSI is running!');
 });
@@ -25,6 +33,10 @@ app.get('/api/test-db', async (req, res) => {
     res.status(500).json({ message: 'Gagal terhubung ke database.' });
   }
 });
+
+// Error middleware (harus paling bawah)
+app.use(notFound);
+app.use(errorHandler);
 
 const DEFAULT_ROLES = [
   { name: 'petani',     description: 'Petani pemilik lahan' },
