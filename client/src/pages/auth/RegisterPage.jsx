@@ -40,7 +40,7 @@ export default function RegisterPage() {
 
       {/* ── Navbar ── */}
       <header style={styles.navbar}>
-        <span style={styles.logo}>Logo</span>
+        <span style={styles.logo}>agrosyncid</span>
       </header>
 
       {/* ── Main ── */}
