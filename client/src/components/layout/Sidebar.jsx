@@ -3,32 +3,71 @@ import { useAuth } from '../../context/AuthContext';
 
 const navByRole = {
   petani: [
-    { to: '/petani/dashboard', label: '🏠 Dashboard' },
-    { to: '/petani/lahan', label: '🗺️ Peta Lahan' },
-    { to: '/petani/panen', label: '🌾 Laporan Panen' },
-    { to: '/petani/rekomendasi', label: '🤖 Rekomendasi AI' },
+    {
+      group: 'LAHAN SAYA',
+      items: [
+        { to: '/petani/dashboard', label: 'Ringkasan', icon: '⌂' },
+        { to: '/petani/lahan', label: 'Kelola Lahan', icon: '▱' },
+        { to: '/petani/panen', label: 'Hasil Panen', icon: '🌾' },
+        { to: '/petani/peternakan', label: 'Peternakan', icon: '🐄' },
+        { to: '/petani/kendala', label: 'Lapor Kendala', icon: '!' },
+      ],
+    },
+    {
+      group: 'LIHAT PETA',
+      items: [
+        { to: '/petani/komoditas', label: 'Peta Komoditas', icon: '▱' },
+        { to: '/petani/wisata', label: 'Lokasi Wisata', icon: '⌖' },
+      ],
+    },
+    {
+      group: 'AI',
+      items: [
+        { to: '/petani/rekomendasi', label: 'Tanya AI', icon: '☷' },
+      ],
+    },
   ],
+
   pengurus: [
-    { to: '/pengurus/dashboard', label: '🏠 Dashboard' },
-    { to: '/pengurus/peta', label: '🗺️ Peta Komoditas' },
-    { to: '/pengurus/laporan', label: '📊 Laporan Potensi' },
-    { to: '/pengurus/rekomendasi', label: '🤖 Rekomendasi AI' },
+    {
+      group: 'MANAJEMEN DESA',
+      items: [
+        { to: '/pengurus/dashboard', label: 'Dashboard', icon: '⌂' },
+        { to: '/pengurus/peta', label: 'Peta Komoditas', icon: '▱' },
+        { to: '/pengurus/laporan', label: 'Laporan Potensi', icon: '▤' },
+        { to: '/pengurus/rekomendasi', label: 'Rekomendasi AI', icon: '✦' },
+      ],
+    },
   ],
+
   masyarakat: [
-    { to: '/masyarakat/dashboard', label: '🏠 Beranda' },
-    { to: '/masyarakat/wisata', label: '🏞️ Wisata' },
-    { to: '/masyarakat/komoditas', label: '🌿 Komoditas' },
+    {
+      group: 'INFORMASI DESA',
+      items: [
+        { to: '/masyarakat/dashboard', label: 'Beranda', icon: '⌂' },
+        { to: '/masyarakat/wisata', label: 'Wisata', icon: '⌖' },
+        { to: '/masyarakat/komoditas', label: 'Komoditas', icon: '🌿' },
+      ],
+    },
   ],
+
   wisata: [
-    { to: '/wisata/dashboard', label: '🏠 Dashboard' },
-    { to: '/wisata/pengunjung', label: '👥 Laporan Pengunjung' },
+    {
+      group: 'WISATA DESA',
+      items: [
+        { to: '/wisata/dashboard', label: 'Dashboard', icon: '⌂' },
+        { to: '/wisata/pengunjung', label: 'Laporan Pengunjung', icon: '▤' },
+      ],
+    },
   ],
 };
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const links = navByRole[user?.role] ?? [];
+
+  const role = user?.role || 'petani';
+  const groups = navByRole[role] || navByRole.petani;
 
   const handleLogout = () => {
     logout();
@@ -36,39 +75,32 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 min-h-screen bg-green-800 text-white flex flex-col">
-      {/* Logo */}
-      <div className="px-6 py-5 border-b border-green-700">
-        <h1 className="text-lg font-bold leading-tight">🌾 Potensi Desa</h1>
-        <p className="text-xs text-green-300 mt-0.5 capitalize">{user?.role}</p>
-      </div>
+    <aside className="dashboard-sidebar">
+      <div className="dashboard-sidebar-inner">
+        {groups.map((group) => (
+          <section className="dashboard-nav-group" key={group.group}>
+            <h2>{group.group}</h2>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {links.map(({ to, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `block px-4 py-2.5 rounded-lg text-sm transition-colors ${
-                isActive
-                  ? 'bg-green-600 font-semibold'
-                  : 'hover:bg-green-700'
-              }`
-            }
-          >
-            {label}
-          </NavLink>
+            <nav>
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    isActive
+                      ? 'dashboard-nav-link is-active'
+                      : 'dashboard-nav-link'
+                  }
+                >
+                  <span className="dashboard-nav-icon">{item.icon}</span>
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          </section>
         ))}
-      </nav>
 
-      {/* User & Logout */}
-      <div className="px-4 py-4 border-t border-green-700">
-        <p className="text-xs text-green-300 truncate mb-2">{user?.name}</p>
-        <button
-          onClick={handleLogout}
-          className="w-full text-sm bg-green-900 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors"
-        >
+        <button type="button" className="dashboard-logout-button" onClick={handleLogout}>
           Keluar
         </button>
       </div>
