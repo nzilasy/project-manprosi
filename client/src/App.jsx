@@ -5,12 +5,18 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import DashboardLayout from './components/layout/DashboardLayout';
 
+import PetaniLayout from './pages/petani/PetaniLayout';
+
 import LandingPage from './pages/public/LandingPage';
+
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+
 import { NotFoundPage, UnauthorizedPage } from './pages/ErrorPages';
 
 import PetaniDashboard from './pages/petani/DashboardPage';
+import LahanPage from './pages/petani/LahanPage';
+
 import PengurusDashboard from './pages/pengurus/DashboardPage';
 import MasyarakatDashboard from './pages/masyarakat/DashboardPage';
 import WisataDashboard from './pages/wisata/DashboardPage';
@@ -23,18 +29,17 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Halaman utama website */}
             <Route path="/" element={<LandingPage />} />
 
-            {/* Auth */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
             {/* Petani */}
             <Route element={<ProtectedRoute roles={['petani']} />}>
-              <Route element={<DashboardLayout />}>
+              <Route element={<PetaniLayout />}>
                 <Route path="/petani/dashboard" element={<PetaniDashboard />} />
+                <Route path="/petani/lahan" element={<LahanPage />} />
               </Route>
             </Route>
 
