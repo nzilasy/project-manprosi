@@ -4,6 +4,7 @@ import {
   TileLayer,
   Marker,
   Popup,
+  Polygon,
   useMapEvents,
 } from 'react-leaflet';
 import L from 'leaflet';
@@ -15,6 +16,11 @@ import './LahanPage.css';
 
 const DEFAULT_CENTER = [-6.9175, 107.6191];
 
+const INDONESIA_BOUNDS = [
+  [-11.2, 94.5],
+  [6.5, 141.5],
+];
+
 const defaultForm = {
   nama_lahan: '',
   id_komoditas: '',
@@ -24,6 +30,7 @@ const defaultForm = {
   tanggal_tanam_terakhir: '',
   latitude: '',
   longitude: '',
+  polygon_lahan: [],
   catatan: '',
   status: 'aktif',
 };
@@ -38,9 +45,25 @@ const markerIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
-function PickLocation({ onPick }) {
+const vertexIcon = L.divIcon({
+  className: 'lahan-vertex-icon-wrapper',
+  html: '<div class="lahan-vertex-icon"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
+function PickLocation({
+  isDrawingPolygon,
+  onPick,
+  onAddPolygonPoint,
+}) {
   useMapEvents({
     click(event) {
+      if (isDrawingPolygon) {
+        onAddPolygonPoint(event.latlng);
+        return;
+      }
+
       onPick(event.latlng);
     },
   });
@@ -51,6 +74,12 @@ function PickLocation({ onPick }) {
 function getLocationText(item) {
   return (
     item.lokasi_lahan ||
+    item.lokasi?.nama_lokasi ||
+    item.lokasi?.nama_desa ||
+    item.lokasi?.alamat ||
+    item.lokasi?.kecamatan ||
+    item.lokasi?.kabupaten ||
+    item.lokasi?.kabupaten_kota ||
     item.Lokasi?.nama_lokasi ||
     item.Lokasi?.nama_desa ||
     item.Lokasi?.alamat ||
@@ -70,7 +99,43 @@ function getKomoditasText(item) {
 }
 
 function getCoordinate(item, field) {
-  return item[field] || item.Lokasi?.[field] || '';
+  return item[field] || item.lokasi?.[field] || item.Lokasi?.[field] || '';
+}
+
+function getPolygonPoints(item) {
+  const polygon = item.polygon_lahan;
+
+  if (!polygon) return [];
+
+  if (typeof polygon === 'string') {
+    try {
+      const parsed = JSON.parse(polygon);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return Array.isArray(polygon) ? polygon : [];
+}
+
+function getPolygonCenter(points) {
+  if (!Array.isArray(points) || points.length === 0) return null;
+
+  const total = points.reduce(
+    (accumulator, point) => {
+      return {
+        lat: accumulator.lat + Number(point[0]),
+        lng: accumulator.lng + Number(point[1]),
+      };
+    },
+    { lat: 0, lng: 0 },
+  );
+
+  return [
+    Number((total.lat / points.length).toFixed(8)),
+    Number((total.lng / points.length).toFixed(8)),
+  ];
 }
 
 export default function LahanPage() {
@@ -83,13 +148,18 @@ export default function LahanPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [isDrawingPolygon, setIsDrawingPolygon] = useState(false);
+  const [polygonPoints, setPolygonPoints] = useState([]);
+
   const selectedPosition = useMemo(() => {
     if (!form.latitude || !form.longitude) return null;
+
     return [Number(form.latitude), Number(form.longitude)];
   }, [form.latitude, form.longitude]);
 
   const visibleLahan = useMemo(() => {
     if (filterStatus === 'semua') return lahan;
+
     return lahan.filter((item) => item.status === filterStatus);
   }, [lahan, filterStatus]);
 
@@ -106,7 +176,12 @@ export default function LahanPage() {
       setLahan(lahanResponse.data.data || []);
       setKomoditas(komoditasResponse.data.data || []);
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Gagal mengambil data lahan.');
+      console.error('Load lahan page error:', error);
+
+      setMessage(
+        error.response?.data?.message ||
+          'Gagal mengambil data lahan atau komoditas.',
+      );
     } finally {
       setLoading(false);
     }
@@ -118,7 +193,11 @@ export default function LahanPage() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name]: value }));
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   };
 
   const handlePickLocation = (latlng) => {
@@ -127,12 +206,104 @@ export default function LahanPage() {
       latitude: latlng.lat.toFixed(8),
       longitude: latlng.lng.toFixed(8),
       lokasi_lahan:
-        previous.lokasi_lahan || `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`,
+        previous.lokasi_lahan ||
+        `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`,
     }));
+  };
+
+  const handleAddPolygonPoint = (latlng) => {
+    const nextPoint = [
+      Number(latlng.lat.toFixed(8)),
+      Number(latlng.lng.toFixed(8)),
+    ];
+
+    setPolygonPoints((previous) => {
+      const next = [...previous, nextPoint];
+
+      setForm((prevForm) => ({
+        ...prevForm,
+        polygon_lahan: next,
+      }));
+
+      return next;
+    });
+  };
+
+  const handleMovePolygonPoint = (index, latlng) => {
+    setPolygonPoints((previous) => {
+      const next = previous.map((point, pointIndex) => {
+        if (pointIndex === index) {
+          return [
+            Number(latlng.lat.toFixed(8)),
+            Number(latlng.lng.toFixed(8)),
+          ];
+        }
+
+        return point;
+      });
+
+      const center = getPolygonCenter(next);
+
+      setForm((prevForm) => ({
+        ...prevForm,
+        polygon_lahan: next,
+        latitude: center ? String(center[0]) : prevForm.latitude,
+        longitude: center ? String(center[1]) : prevForm.longitude,
+      }));
+
+      return next;
+    });
+  };
+
+  const handleStartDrawPolygon = () => {
+    setIsDrawingPolygon(true);
+    setMessage(
+      'Mode gambar aktif. Klik beberapa titik pada peta untuk membuat batas lahan.',
+    );
+  };
+
+  const handleFinishDrawPolygon = () => {
+    if (polygonPoints.length < 3) {
+      setMessage('Minimal 3 titik diperlukan untuk membuat batas lahan.');
+      return;
+    }
+
+    const center = getPolygonCenter(polygonPoints);
+
+    setIsDrawingPolygon(false);
+
+    setForm((previous) => ({
+      ...previous,
+      polygon_lahan: polygonPoints,
+      latitude: previous.latitude || String(center?.[0] || ''),
+      longitude: previous.longitude || String(center?.[1] || ''),
+      lokasi_lahan:
+        previous.lokasi_lahan ||
+        `${center?.[0]?.toFixed?.(5) || center?.[0]}, ${
+          center?.[1]?.toFixed?.(5) || center?.[1]
+        }`,
+    }));
+
+    setMessage(
+      'Batas lahan berhasil dibuat. Titik kuning sekarang bisa digeser bebas.',
+    );
+  };
+
+  const handleClearPolygon = () => {
+    setIsDrawingPolygon(false);
+    setPolygonPoints([]);
+
+    setForm((previous) => ({
+      ...previous,
+      polygon_lahan: [],
+    }));
+
+    setMessage('Batas lahan dihapus.');
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
     setSaving(true);
     setMessage('');
 
@@ -144,6 +315,7 @@ export default function LahanPage() {
         lokasi_lahan: form.lokasi_lahan || null,
         latitude: form.latitude ? Number(form.latitude) : null,
         longitude: form.longitude ? Number(form.longitude) : null,
+        polygon_lahan: polygonPoints.length >= 3 ? polygonPoints : null,
         tanggal_tanam_terakhir: form.tanggal_tanam_terakhir || null,
       };
 
@@ -156,17 +328,28 @@ export default function LahanPage() {
       }
 
       setForm(defaultForm);
+      setPolygonPoints([]);
+      setIsDrawingPolygon(false);
       setEditingId(null);
+
       await loadData();
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Gagal menyimpan data lahan.');
+      console.error('Save lahan error:', error);
+
+      setMessage(
+        error.response?.data?.message || 'Gagal menyimpan data lahan.',
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const handleEdit = (item) => {
+    const savedPolygon = getPolygonPoints(item);
+
     setEditingId(item.id_lahan);
+    setPolygonPoints(savedPolygon);
+    setIsDrawingPolygon(false);
 
     setForm({
       nama_lahan: item.nama_lahan || '',
@@ -177,27 +360,40 @@ export default function LahanPage() {
       tanggal_tanam_terakhir: item.tanggal_tanam_terakhir || '',
       latitude: getCoordinate(item, 'latitude'),
       longitude: getCoordinate(item, 'longitude'),
+      polygon_lahan: savedPolygon,
       catatan: item.catatan || item.deskripsi || '',
       status: item.status || 'aktif',
     });
+
+    setMessage(
+      'Mode edit aktif. Kamu bisa menggeser titik kuning untuk mengubah bentuk batas lahan.',
+    );
   };
 
   const handleCancel = () => {
     setEditingId(null);
     setForm(defaultForm);
+    setPolygonPoints([]);
+    setIsDrawingPolygon(false);
     setMessage('');
   };
 
   const handleDelete = async (id) => {
     const confirmed = window.confirm('Hapus data lahan ini?');
+
     if (!confirmed) return;
 
     try {
       await lahanService.remove(id);
+
       setMessage('Data lahan berhasil dihapus.');
       await loadData();
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Gagal menghapus data lahan.');
+      console.error('Delete lahan error:', error);
+
+      setMessage(
+        error.response?.data?.message || 'Gagal menghapus data lahan.',
+      );
     }
   };
 
@@ -210,7 +406,11 @@ export default function LahanPage() {
           <p>Lihat sebaran dan detail lahan pertanian Anda.</p>
         </div>
 
-        <button type="button" className="lahan-add-button" onClick={handleCancel}>
+        <button
+          type="button"
+          className="lahan-add-button"
+          onClick={handleCancel}
+        >
           + Tambahkan Lahan Baru
         </button>
       </div>
@@ -222,6 +422,7 @@ export default function LahanPage() {
           <div className="lahan-map-card">
             <div className="lahan-map-filter">
               <span>🗺️</span>
+
               <select
                 value={filterStatus}
                 onChange={(event) => setFilterStatus(event.target.value)}
@@ -232,9 +433,30 @@ export default function LahanPage() {
               </select>
             </div>
 
+            <div className="lahan-polygon-tools">
+              <button
+                type="button"
+                className={isDrawingPolygon ? 'is-active' : ''}
+                onClick={handleStartDrawPolygon}
+              >
+                ✏️ Gambar Batas
+              </button>
+
+              <button type="button" onClick={handleFinishDrawPolygon}>
+                ✅ Selesai
+              </button>
+
+              <button type="button" onClick={handleClearPolygon}>
+                🗑️ Hapus
+              </button>
+            </div>
+
             <MapContainer
               center={selectedPosition || DEFAULT_CENTER}
               zoom={selectedPosition ? 14 : 12}
+              minZoom={5}
+              maxBounds={INDONESIA_BOUNDS}
+              maxBoundsViscosity={0.85}
               scrollWheelZoom
               className="lahan-map"
             >
@@ -243,21 +465,96 @@ export default function LahanPage() {
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               />
 
-            <TileLayer
-            attribution="Labels &copy; Esri"
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-            />
+              <TileLayer
+                attribution="Labels &copy; Esri"
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+              />
 
-              <PickLocation onPick={handlePickLocation} />
+              <PickLocation
+                isDrawingPolygon={isDrawingPolygon}
+                onPick={handlePickLocation}
+                onAddPolygonPoint={handleAddPolygonPoint}
+              />
 
+              {/* Polygon lahan tersimpan selain yang sedang diedit */}
               {visibleLahan.map((item) => {
+                if (editingId && item.id_lahan === editingId) return null;
+
+                const polygon = getPolygonPoints(item);
+
+                if (polygon.length < 3) return null;
+
+                return (
+                  <Polygon
+                    key={`polygon-${item.id_lahan}`}
+                    positions={polygon}
+                    pathOptions={{
+                      color: '#facc15',
+                      weight: 3,
+                      fillColor: '#facc15',
+                      fillOpacity: 0.12,
+                    }}
+                  >
+                    <Popup>
+                      <strong>{item.nama_lahan}</strong>
+                      <br />
+                      {getKomoditasText(item)}
+                      <br />
+                      {item.luas} {item.satuan_luas || 'ha'}
+                    </Popup>
+                  </Polygon>
+                );
+              })}
+
+              {/* Polygon yang sedang dibuat / diedit */}
+              {polygonPoints.length >= 2 && (
+                <Polygon
+                  positions={polygonPoints}
+                  pathOptions={{
+                    color: '#facc15',
+                    weight: 4,
+                    fillColor: '#facc15',
+                    fillOpacity: 0.18,
+                    dashArray: isDrawingPolygon ? '8 6' : null,
+                  }}
+                />
+              )}
+
+              {/* Titik polygon yang bisa digeser */}
+              {polygonPoints.map((point, index) => (
+                <Marker
+                  key={`vertex-${index}`}
+                  position={point}
+                  icon={vertexIcon}
+                  draggable
+                  eventHandlers={{
+                    drag: (event) => {
+                      const latlng = event.target.getLatLng();
+                      handleMovePolygonPoint(index, latlng);
+                    },
+                    dragend: (event) => {
+                      const latlng = event.target.getLatLng();
+                      handleMovePolygonPoint(index, latlng);
+                    },
+                  }}
+                />
+              ))}
+
+              {/* Marker lahan tersimpan */}
+              {visibleLahan.map((item) => {
+                if (editingId && item.id_lahan === editingId) return null;
+
                 const lat = Number(getCoordinate(item, 'latitude'));
                 const lng = Number(getCoordinate(item, 'longitude'));
 
                 if (!lat || !lng) return null;
 
                 return (
-                  <Marker key={item.id_lahan} position={[lat, lng]} icon={markerIcon}>
+                  <Marker
+                    key={item.id_lahan}
+                    position={[lat, lng]}
+                    icon={markerIcon}
+                  >
                     <Popup>
                       <strong>{item.nama_lahan}</strong>
                       <br />
@@ -269,6 +566,7 @@ export default function LahanPage() {
                 );
               })}
 
+              {/* Marker lokasi yang sedang dipilih */}
               {selectedPosition && (
                 <Marker position={selectedPosition} icon={markerIcon}>
                   <Popup>Lokasi yang dipilih</Popup>
@@ -277,7 +575,8 @@ export default function LahanPage() {
             </MapContainer>
 
             <small>
-              Sumber peta: Esri World Imagery. Klik peta untuk memilih lokasi lahan.
+              Sumber peta: Esri World Imagery. Klik peta untuk memilih lokasi
+              lahan.
             </small>
           </div>
 
@@ -293,24 +592,39 @@ export default function LahanPage() {
               ) : (
                 visibleLahan.map((item) => (
                   <article className="lahan-item" key={item.id_lahan}>
-                    <div className="lahan-thumb" aria-hidden="true">🌾</div>
+                    <div className="lahan-thumb" aria-hidden="true">
+                      🌾
+                    </div>
 
                     <div className="lahan-item-body">
                       <div className="lahan-item-title-row">
                         <h3>{item.nama_lahan}</h3>
-                        <span className={`lahan-status ${item.status === 'aktif' ? 'is-active' : 'is-muted'}`}>
+
+                        <span
+                          className={`lahan-status ${
+                            item.status === 'aktif' ? 'is-active' : 'is-muted'
+                          }`}
+                        >
                           {item.status || 'aktif'}
                         </span>
                       </div>
 
                       <p>
-                        {item.luas} {item.satuan_luas || 'ha'} • {getLocationText(item)} • {getKomoditasText(item)}
+                        {item.luas} {item.satuan_luas || 'ha'} •{' '}
+                        {getLocationText(item)} • {getKomoditasText(item)}
                       </p>
                     </div>
 
                     <div className="lahan-item-actions">
-                      <button type="button" onClick={() => handleEdit(item)}>Edit</button>
-                      <button type="button" className="danger" onClick={() => handleDelete(item.id_lahan)}>
+                      <button type="button" onClick={() => handleEdit(item)}>
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => handleDelete(item.id_lahan)}
+                      >
                         Hapus
                       </button>
                     </div>
@@ -339,8 +653,13 @@ export default function LahanPage() {
 
             <label>
               Komoditas Utama
-              <select name="id_komoditas" value={form.id_komoditas} onChange={handleChange}>
+              <select
+                name="id_komoditas"
+                value={form.id_komoditas}
+                onChange={handleChange}
+              >
                 <option value="">Pilih komoditas</option>
+
                 {komoditas.map((item) => (
                   <option key={item.id_komoditas} value={item.id_komoditas}>
                     {item.nama_komoditas}
@@ -363,7 +682,11 @@ export default function LahanPage() {
                   required
                 />
 
-                <select name="satuan_luas" value={form.satuan_luas} onChange={handleChange}>
+                <select
+                  name="satuan_luas"
+                  value={form.satuan_luas}
+                  onChange={handleChange}
+                >
                   <option value="ha">ha</option>
                   <option value="m2">m²</option>
                 </select>
@@ -383,7 +706,9 @@ export default function LahanPage() {
             <button
               type="button"
               className="lahan-pick-button"
-              onClick={() => setMessage('Klik area pada peta untuk memilih lokasi lahan.')}
+              onClick={() =>
+                setMessage('Klik area pada peta untuk memilih lokasi lahan.')
+              }
             >
               📍 Pilih lokasi di peta
             </button>
@@ -422,7 +747,11 @@ export default function LahanPage() {
 
             <label>
               Status
-              <select name="status" value={form.status} onChange={handleChange}>
+              <select
+                name="status"
+                value={form.status}
+                onChange={handleChange}
+              >
                 <option value="aktif">Aktif</option>
                 <option value="nonaktif">Nonaktif</option>
               </select>
@@ -440,7 +769,14 @@ export default function LahanPage() {
             </label>
 
             <div className="lahan-form-actions">
-              <button type="button" className="secondary" onClick={handleCancel}>Batal</button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={handleCancel}
+              >
+                Batal
+              </button>
+
               <button type="submit" disabled={saving}>
                 {saving ? 'Menyimpan...' : 'Simpan Lahan'}
               </button>

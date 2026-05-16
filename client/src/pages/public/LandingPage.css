@@ -34,7 +34,6 @@
 }
 
 .landing-page button {
-  border: 0;
   cursor: pointer;
 }
 
@@ -109,17 +108,6 @@
   gap: 12px;
 }
 
-.landing-nav-actions select,
-.landing-map-filter select,
-.landing-filter-grid select,
-.landing-card-title-row select,
-.landing-page input {
-  border: 1px solid var(--landing-border);
-  background: #fff;
-  color: #52635d;
-  border-radius: 10px;
-}
-
 .landing-nav-search {
   width: 260px;
   height: 42px;
@@ -144,39 +132,29 @@
   background: transparent;
 }
 
-.landing-nav-search input::placeholder {
-  color: #8a9893;
-}
-
 .landing-nav-search button {
   height: 100%;
   padding: 0 15px;
+  border: 0;
   color: #fff;
   background: var(--landing-primary);
   font-size: 13px;
   font-weight: 700;
 }
 
-.landing-nav-search button:hover {
-  background: var(--landing-primary-dark);
-}
-
 .landing-login-button,
-.landing-primary-button,
-.landing-map-filter button,
-.landing-filter-header button {
+.landing-primary-button {
   background: var(--landing-primary);
   color: #fff;
   border-radius: 10px;
+  border: 0;
   font-weight: 700;
   box-shadow: 0 12px 24px rgba(49, 95, 77, 0.18);
   transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .landing-login-button:hover,
-.landing-primary-button:hover,
-.landing-map-filter button:hover,
-.landing-filter-header button:hover {
+.landing-primary-button:hover {
   background: var(--landing-primary-dark);
   transform: translateY(-1px);
   box-shadow: 0 16px 30px rgba(49, 95, 77, 0.22);
@@ -240,6 +218,8 @@
   flex: 1;
   height: 52px;
   padding: 0 18px;
+  border: 1px solid var(--landing-border);
+  border-radius: 10px;
   font-size: 14px;
   box-shadow: 0 14px 28px rgba(51, 73, 61, 0.08);
 }
@@ -289,8 +269,6 @@
       rgba(23, 52, 43, 0.22) 100%
     );
 }
-
-
 
 .landing-stats-section,
 .landing-map-section,
@@ -379,41 +357,42 @@
   min-height: 560px;
   overflow: hidden;
   border: 1px solid var(--landing-border);
-  border-radius: 24px;
-  background: #d8e6e1;
+  border-radius: 18px;
+  background: #ffffff;
   box-shadow: var(--landing-shadow);
 }
 
 .landing-map {
   width: 100%;
+  height: 560px;
   min-height: 560px;
-  border-radius: 24px;
+  border-radius: 18px;
   z-index: 1;
 }
 
+
+
 .landing-map-filter {
   position: absolute;
-  top: 28px;
-  right: 28px;
+  top: 22px;
+  right: 22px;
   z-index: 500;
   width: 250px;
   padding: 20px;
   border: 1px solid rgba(226, 232, 228, 0.8);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 42px rgba(25, 43, 37, 0.18);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
   backdrop-filter: blur(16px);
 }
 
-.landing-map-filter h3,
-.landing-filter-header h3 {
+.landing-map-filter h3 {
   margin: 0 0 14px;
   font-size: 17px;
   color: #1b2f28;
 }
 
-.landing-map-filter label,
-.landing-filter-grid label {
+.landing-map-filter label {
   display: grid;
   gap: 7px;
   color: #51645d;
@@ -426,12 +405,13 @@
 }
 
 .landing-map-filter input,
-.landing-map-filter select,
-.landing-filter-grid input,
-.landing-filter-grid select {
+.landing-map-filter select {
   width: 100%;
   height: 40px;
   padding: 0 11px;
+  border: 1px solid var(--landing-border);
+  border-radius: 10px;
+  background: #ffffff;
   color: #596a65;
   font-size: 13px;
 }
@@ -450,10 +430,26 @@
   color: #374b44;
 }
 
-.landing-map-legend span {
+.landing-map-legend button {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 28px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #63736d;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.landing-map-legend button:hover,
+.landing-map-legend button.is-active {
+  background: #eef6f1;
+  color: #2f6f55;
 }
 
 .landing-map-legend i {
@@ -474,10 +470,20 @@
   background: var(--landing-brown);
 }
 
-.landing-map-filter button {
+.landing-map-filter > button {
   width: 100%;
   height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--landing-primary);
+  color: #ffffff;
   font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.landing-map-filter > button:hover {
+  background: var(--landing-primary-dark);
 }
 
 .landing-map-popup {
@@ -516,7 +522,7 @@
 .landing-popup-tags b {
   padding: 4px 8px;
   border-radius: 999px;
-  color: #fff;
+  color: #ffffff;
   background: var(--landing-brown);
   font-size: 11px;
 }
@@ -548,35 +554,6 @@
 .landing-map-popup dd {
   color: #1b2f28;
   font-weight: 800;
-}
-
-.landing-filter-panel {
-  margin-top: 24px;
-  padding: 22px;
-  border: 1px solid var(--landing-border);
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(31, 68, 53, 0.08);
-}
-
-.landing-filter-header,
-.landing-card-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.landing-filter-header button {
-  padding: 10px 18px;
-  font-size: 13px;
-}
-
-.landing-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 16px;
 }
 
 .landing-analytics-section {
@@ -692,9 +669,18 @@
   background: linear-gradient(90deg, var(--landing-primary), #85a96e);
 }
 
+.landing-card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
 .landing-card-title-row select {
   height: 36px;
   padding: 0 10px;
+  border: 1px solid var(--landing-border);
+  border-radius: 10px;
 }
 
 .landing-bar-chart .bar-1,
@@ -804,10 +790,17 @@
   }
 
   .landing-stats-grid,
-  .landing-filter-grid,
   .landing-analytics-section,
   .landing-insight-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .landing-section-heading {
+    display: block;
+  }
+
+  .landing-section-heading p:last-child {
+    margin-top: 12px;
   }
 }
 
@@ -817,16 +810,16 @@
   }
 
   .landing-nav-search {
-  width: 100%;
-}
+    width: 100%;
+  }
 
-.landing-nav-actions {
-  width: 100%;
-}
+  .landing-nav-actions {
+    width: 100%;
+  }
 
-.landing-login-button {
-  white-space: nowrap;
-}
+  .landing-login-button {
+    white-space: nowrap;
+  }
 
   .landing-hero-section {
     background: #f5f1eb;
@@ -846,7 +839,6 @@
   }
 
   .landing-stats-grid,
-  .landing-filter-grid,
   .landing-analytics-section,
   .landing-insight-metrics {
     grid-template-columns: 1fr;
@@ -855,7 +847,10 @@
   .landing-map-card,
   .landing-map {
     min-height: 640px;
+    height: 640px;
   }
+
+
 
   .landing-map-filter {
     inset: auto 14px 14px 14px;
