@@ -74,6 +74,44 @@ function normalizeOptionalNumber(value) {
   return number;
 }
 
+function normalizePolygon(value) {
+  if (!value) return null;
+
+  let polygon = value;
+
+  if (typeof value === 'string') {
+    try {
+      polygon = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!Array.isArray(polygon)) return null;
+
+  const points = polygon
+    .map((point) => {
+      if (Array.isArray(point)) {
+        return [Number(point[0]), Number(point[1])];
+      }
+
+      if (point && typeof point === 'object') {
+        return [Number(point.lat), Number(point.lng)];
+      }
+
+      return null;
+    })
+    .filter((point) => {
+      return (
+        point &&
+        !Number.isNaN(point[0]) &&
+        !Number.isNaN(point[1])
+      );
+    });
+
+  return points.length >= 3 ? points : null;
+}
+
 // GET /api/lahan/summary
 router.get('/summary', async (req, res) => {
   try {
@@ -83,6 +121,7 @@ router.get('/summary', async (req, res) => {
     });
 
     const totalLahan = lahan.length;
+
     const totalLuas = lahan.reduce((sum, item) => {
       return sum + Number(item.luas || 0);
     }, 0);
@@ -117,6 +156,7 @@ router.get('/summary', async (req, res) => {
 
     return res.status(500).json({
       message: 'Gagal mengambil ringkasan lahan.',
+      error: error.message,
     });
   }
 });
@@ -156,6 +196,7 @@ router.get('/', async (req, res) => {
 
     return res.status(500).json({
       message: 'Gagal mengambil data lahan.',
+      error: error.message,
     });
   }
 });
@@ -184,6 +225,7 @@ router.get('/:id', async (req, res) => {
 
     return res.status(500).json({
       message: 'Gagal mengambil detail lahan.',
+      error: error.message,
     });
   }
 });
@@ -209,6 +251,7 @@ router.post('/', async (req, res) => {
       tanggal_tanam_terakhir,
       latitude,
       longitude,
+      polygon_lahan,
       status,
       catatan,
       deskripsi,
@@ -247,6 +290,7 @@ router.post('/', async (req, res) => {
       tanggal_tanam_terakhir: tanggal_tanam_terakhir || null,
       latitude: normalizeOptionalNumber(latitude),
       longitude: normalizeOptionalNumber(longitude),
+      polygon_lahan: normalizePolygon(polygon_lahan),
       status: status || 'aktif',
       catatan: catatan || null,
       deskripsi: deskripsi || null,
@@ -317,6 +361,10 @@ router.put('/:id', async (req, res) => {
         req.body.longitude === undefined
           ? lahan.longitude
           : normalizeOptionalNumber(req.body.longitude),
+      polygon_lahan:
+        req.body.polygon_lahan === undefined
+          ? lahan.polygon_lahan
+          : normalizePolygon(req.body.polygon_lahan),
       status: req.body.status ?? lahan.status,
       catatan: req.body.catatan ?? lahan.catatan,
       deskripsi: req.body.deskripsi ?? lahan.deskripsi,

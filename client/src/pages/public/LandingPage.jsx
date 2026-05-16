@@ -5,11 +5,12 @@ import {
   TileLayer,
   CircleMarker,
   Popup,
-  Rectangle,
 } from 'react-leaflet';
 
 import heroImage from '../../assets/orang_petani.jpeg';
 import './LandingPage.css';
+
+const indonesiaCenter = [-2.5489, 118.0149];
 
 const indonesiaBounds = [
   [-11.2, 94.5],
@@ -104,33 +105,50 @@ const commodities = [
 ];
 
 export default function LandingPage() {
-    const [searchTerm, setSearchTerm] = useState('');
+  const [mapSearch, setMapSearch] = useState('');
+  const [selectedCommodity, setSelectedCommodity] = useState('semua');
+  const [selectedPotential, setSelectedPotential] = useState('semua');
 
   const filteredRegions = useMemo(() => {
-    const keyword = searchTerm.trim().toLowerCase();
-
-    if (!keyword) {
-      return highlightedRegions;
-    }
+    const keyword = mapSearch.trim().toLowerCase();
 
     return highlightedRegions.filter((region) => {
-      return (
+      const matchKeyword =
+        !keyword ||
         region.name.toLowerCase().includes(keyword) ||
         region.province.toLowerCase().includes(keyword) ||
-        region.commodity.some((item) => item.toLowerCase().includes(keyword))
-      );
+        region.commodity.some((item) => item.toLowerCase().includes(keyword));
+
+      const matchCommodity =
+        selectedCommodity === 'semua' ||
+        region.commodity.some(
+          (item) => item.toLowerCase() === selectedCommodity.toLowerCase(),
+        );
+
+      const matchPotential =
+        selectedPotential === 'semua' ||
+        region.status.toLowerCase().includes(selectedPotential.toLowerCase());
+
+      return matchKeyword && matchCommodity && matchPotential;
     });
-  }, [searchTerm]);
+  }, [mapSearch, selectedCommodity, selectedPotential]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
 
     const mapSection = document.getElementById('peta');
+
     if (mapSection) {
       mapSection.scrollIntoView({ behavior: 'smooth' });
     }
   };
-  
+
+  const handleResetFilter = () => {
+    setMapSearch('');
+    setSelectedCommodity('semua');
+    setSelectedPotential('semua');
+  };
+
   return (
     <div className="landing-page">
       <header className="landing-navbar">
@@ -142,33 +160,32 @@ export default function LandingPage() {
         <nav className="landing-nav-links" aria-label="Navigasi utama">
           <a href="#beranda">Beranda</a>
           <a href="#potensi">Potensi</a>
+          <a href="#peta">Peta</a>
           <a href="#produksi">Produksi</a>
           <a href="#laporan">Laporan</a>
         </nav>
 
         <div className="landing-nav-actions">
-    <form className="landing-nav-search" onSubmit={handleSearchSubmit}>
-    <label className="visually-hidden" htmlFor="navbar-search">
-      Cari wilayah
-    </label>
+          <form className="landing-nav-search" onSubmit={handleSearchSubmit}>
+            <label className="visually-hidden" htmlFor="navbar-search">
+              Cari wilayah
+            </label>
 
-    <input
-      id="navbar-search"
-      type="search"
-      placeholder="Cari wilayah..."
-      value={searchTerm}
-      onChange={(event) => setSearchTerm(event.target.value)}
-    />
+            <input
+              id="navbar-search"
+              type="search"
+              placeholder="Cari wilayah..."
+              value={mapSearch}
+              onChange={(event) => setMapSearch(event.target.value)}
+            />
 
-    <button type="submit" aria-label="Cari wilayah">
-      Cari
-    </button>
-  </form>
+            <button type="submit">Cari</button>
+          </form>
 
-  <Link to="/login" className="landing-login-button">
-    Masuk
-  </Link>
-</div>
+          <Link to="/login" className="landing-login-button">
+            Masuk
+          </Link>
+        </div>
       </header>
 
       <main>
@@ -187,10 +204,7 @@ export default function LandingPage() {
                 Indonesia.
               </p>
 
-              <form
-                className="landing-search-card"
-                onSubmit={handleSearchSubmit}
-              >
+              <form className="landing-search-card" onSubmit={handleSearchSubmit}>
                 <label className="visually-hidden" htmlFor="landing-search">
                   Cari wilayah
                 </label>
@@ -199,13 +213,13 @@ export default function LandingPage() {
                   id="landing-search"
                   type="search"
                   placeholder="Contoh: Bandung, Garut, Cianjur..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  value={mapSearch}
+                  onChange={(event) => setMapSearch(event.target.value)}
                 />
 
-                <a href="#peta" className="landing-primary-button">
+                <button type="submit" className="landing-primary-button">
                   Lihat Peta
-                </a>
+                </button>
               </form>
             </div>
 
@@ -220,9 +234,6 @@ export default function LandingPage() {
               />
 
               <div className="landing-hero-image-fade" />
-
-              <div className="landing-farmer-card">
-              </div>
             </div>
           </div>
         </section>
@@ -272,25 +283,22 @@ export default function LandingPage() {
 
           <div className="landing-map-card">
             <MapContainer
-              bounds={indonesiaBounds}
+              center={indonesiaCenter}
+              zoom={5}
+              minZoom={5}
               maxBounds={indonesiaBounds}
               maxBoundsViscosity={0.85}
-              minZoom={4}
               scrollWheelZoom={false}
               className="landing-map"
             >
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               />
 
-              <Rectangle
-                bounds={indonesiaBounds}
-                pathOptions={{
-                  color: '#2f6f55',
-                  weight: 1,
-                  fillOpacity: 0,
-                }}
+              <TileLayer
+                attribution="Labels &copy; Esri"
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
               />
 
               {filteredRegions.map((region) => (
@@ -302,7 +310,7 @@ export default function LandingPage() {
                     color: '#ffffff',
                     weight: 2,
                     fillColor: region.color,
-                    fillOpacity: 0.92,
+                    fillOpacity: 0.95,
                   }}
                 >
                   <Popup>
@@ -345,20 +353,26 @@ export default function LandingPage() {
               <label>
                 Wilayah
                 <input
-                type="text"
-                 placeholder="Contoh: Bandung"
-                 value={searchTerm}
-                 onChange={(event) => setSearchTerm(event.target.value)}
-                    />
+                  type="text"
+                  placeholder="Contoh: Bandung"
+                  value={mapSearch}
+                  onChange={(event) => setMapSearch(event.target.value)}
+                />
               </label>
 
               <label>
                 Komoditas
-                <select defaultValue="semua">
+                <select
+                  value={selectedCommodity}
+                  onChange={(event) => setSelectedCommodity(event.target.value)}
+                >
                   <option value="semua">Semua komoditas</option>
-                  <option value="padi">Padi</option>
-                  <option value="sayuran">Sayuran</option>
-                  <option value="kopi">Kopi</option>
+                  <option value="Padi">Padi</option>
+                  <option value="Sayuran">Sayuran</option>
+                  <option value="Kopi">Kopi</option>
+                  <option value="Jagung">Jagung</option>
+                  <option value="Kakao">Kakao</option>
+                  <option value="Sagu">Sagu</option>
                 </select>
               </label>
 
@@ -373,65 +387,47 @@ export default function LandingPage() {
 
               <div className="landing-map-legend">
                 <p>Tingkat Potensi</p>
-                <span>
+
+                <button
+                  type="button"
+                  className={selectedPotential === 'semua' ? 'is-active' : ''}
+                  onClick={() => setSelectedPotential('semua')}
+                >
+                  Semua
+                </button>
+
+                <button
+                  type="button"
+                  className={selectedPotential === 'tinggi' ? 'is-active' : ''}
+                  onClick={() => setSelectedPotential('tinggi')}
+                >
                   <i className="legend-high" />
                   Tinggi
-                </span>
-                <span>
+                </button>
+
+                <button
+                  type="button"
+                  className={selectedPotential === 'sedang' ? 'is-active' : ''}
+                  onClick={() => setSelectedPotential('sedang')}
+                >
                   <i className="legend-medium" />
                   Sedang
-                </span>
-                <span>
+                </button>
+
+                <button
+                  type="button"
+                  className={selectedPotential === 'baru' ? 'is-active' : ''}
+                  onClick={() => setSelectedPotential('baru')}
+                >
                   <i className="legend-low" />
                   Baru
-                </span>
+                </button>
               </div>
 
-              <button type="button">Terapkan Filter</button>
+              <button type="button" onClick={handleResetFilter}>
+                Reset Filter
+              </button>
             </aside>
-          </div>
-
-          <div className="landing-filter-panel">
-            <div className="landing-filter-header">
-              <h3>Filter Data</h3>
-              <button type="button">Terapkan</button>
-            </div>
-
-            <div className="landing-filter-grid">
-              <label>
-                Pilih Wilayah
-                <input type="text" placeholder="Contoh: Subang, Garut..." />
-              </label>
-
-              <label>
-                Pilih Komoditas
-                <select defaultValue="semua">
-                  <option value="semua">Semua Komoditas</option>
-                  <option value="padi">Padi</option>
-                  <option value="sayuran">Sayuran</option>
-                  <option value="kopi">Kopi</option>
-                </select>
-              </label>
-
-              <label>
-                Tahun Data
-                <select defaultValue="2024">
-                  <option value="2024">2024</option>
-                  <option value="2023">2023</option>
-                  <option value="2022">2022</option>
-                </select>
-              </label>
-
-              <label>
-                Tingkat Potensi
-                <select defaultValue="semua">
-                  <option value="semua">Semua</option>
-                  <option value="tinggi">Tinggi</option>
-                  <option value="sedang">Sedang</option>
-                  <option value="baru">Baru</option>
-                </select>
-              </label>
-            </div>
           </div>
         </section>
 
@@ -466,9 +462,11 @@ export default function LandingPage() {
               {commodities.map((item) => (
                 <div className="landing-commodity-row" key={item.name}>
                   <span>{item.name}</span>
+
                   <div className="landing-commodity-track">
                     <i style={{ width: item.value }} />
                   </div>
+
                   <strong>{item.value}</strong>
                 </div>
               ))}
@@ -512,11 +510,13 @@ export default function LandingPage() {
               value="20%"
               text="dari tahun sebelumnya"
             />
+
             <Metric
               title="Komoditas unggulan"
               value="Padi, Sayuran, Kopi"
               text="berdasarkan data wilayah"
             />
+
             <Metric
               title="Curah hujan ideal"
               value="1.800 - 2.500 mm"

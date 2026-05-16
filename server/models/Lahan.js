@@ -48,6 +48,10 @@ const Lahan = sequelize.define('Lahan', {
     type: DataTypes.DECIMAL(11, 8),
     allowNull: true,
   },
+  polygon_lahan: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   status: {
     type: DataTypes.STRING(50),
     defaultValue: 'aktif',
