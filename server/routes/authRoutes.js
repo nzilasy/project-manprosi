@@ -1,12 +1,19 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { Op } = require('sequelize');
 const { User, Role } = require('../models/index');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 const VALID_ROLES = ['petani', 'pengurus', 'masyarakat', 'wisata'];
+const RESET_TOKEN_EXPIRES_IN_MS = 60 * 60 * 1000;
+
+function hashResetToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -94,6 +101,85 @@ router.post('/login', async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
+    return res.status(500).json({ message: 'Terjadi kesalahan server.' });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email wajib diisi.' });
+  }
+
+  try {
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.json({
+        message: 'Jika email terdaftar, link reset password akan tersedia.',
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetUrl = `/reset-password/${resetToken}`;
+
+    await user.update({
+      reset_password_token: hashResetToken(resetToken),
+      reset_password_expires: new Date(Date.now() + RESET_TOKEN_EXPIRES_IN_MS),
+    });
+
+    return res.json({
+      message: 'Link reset password berhasil dibuat.',
+      reset_url: resetUrl,
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    return res.status(500).json({ message: 'Terjadi kesalahan server.' });
+  }
+});
+
+// POST /api/auth/reset-password/:token
+router.post('/reset-password/:token', async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ message: 'Password baru wajib diisi.' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'Password minimal 6 karakter.' });
+  }
+
+  try {
+    const user = await User.findOne({
+      where: {
+        reset_password_token: hashResetToken(token),
+        reset_password_expires: {
+          [Op.gt]: new Date(),
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        message: 'Link reset password tidak valid atau sudah kadaluarsa.',
+      });
+    }
+
+    await user.update({
+      password: await bcrypt.hash(password, 10),
+      reset_password_token: null,
+      reset_password_expires: null,
+    });
+
+    return res.json({
+      message: 'Password berhasil diperbarui. Silakan login.',
+    });
+  } catch (err) {
+    console.error('Reset password error:', err);
     return res.status(500).json({ message: 'Terjadi kesalahan server.' });
   }
 });
