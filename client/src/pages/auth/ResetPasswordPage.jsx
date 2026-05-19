@@ -1,42 +1,48 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { Link, useParams } from 'react-router-dom';
+import { authService } from '../../services/authService';
 import agrosyncLogo from '../../assets/Logo_project.jpeg';
 
-const ROLE_REDIRECTS = {
-  petani: '/petani/dashboard',
-  pengurus: '/pengurus/dashboard',
-  masyarakat: '/masyarakat/dashboard',
-  wisata: '/wisata/dashboard',
-};
-
 const BTN_COLOR = '#4d7c6f';
-const BTN_HOVER  = '#3d6b5e';
+const BTN_HOVER = '#3d6b5e';
 
-export default function LoginPage() {
-  const { login, loading } = useAuth();
-  const navigate = useNavigate();
-  const [form, setForm]   = useState({ email: '', password: '' });
+export default function ResetPasswordPage() {
+  const { token } = useParams();
+  const [form, setForm] = useState({ password: '', confirmPassword: '' });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
-  const handleChange = (e) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((previous) => ({ ...previous, [name]: value }));
+  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
+    setMessage('');
+
+    if (form.password !== form.confirmPassword) {
+      setError('Konfirmasi password tidak sama.');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const user = await login(form);
-      navigate(ROLE_REDIRECTS[user.role] ?? '/');
+      const { data } = await authService.resetPassword(token, form.password);
+      setMessage(data.message || 'Password berhasil diperbarui.');
+      setForm({ password: '', confirmPassword: '' });
     } catch (err) {
-      setError(err.response?.data?.message ?? 'Login gagal. Periksa kembali email & password.');
+      setError(err.response?.data?.message ?? 'Gagal memperbarui password.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div style={styles.page}>
-
-      {/* ── Navbar ── */}
       <header style={styles.navbar}>
         <Link to="/" style={styles.logo}>
           <img src={agrosyncLogo} alt="Agrosync ID" style={styles.logoImage} />
@@ -44,64 +50,55 @@ export default function LoginPage() {
         </Link>
       </header>
 
-      {/* ── Main ── */}
       <main style={styles.main}>
         <div style={styles.card}>
+          <h1 style={styles.title}>Reset Password</h1>
+          <p style={styles.subtitle}>Masukkan password baru untuk akun Anda.</p>
 
-          {/* Error banner */}
-          {error && (
-            <div style={styles.errorBanner}>{error}</div>
-          )}
+          {error && <div style={styles.errorBanner}>{error}</div>}
+          {message && <div style={styles.successBanner}>{message}</div>}
 
           <form onSubmit={handleSubmit} style={styles.form}>
-
-            {/* Email */}
-            <Field label="Email">
-              <Input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="agrosync@gmail.com"
-                required
-              />
-            </Field>
-
-            {/* Password */}
-            <Field label="Password">
+            <Field label="Password Baru">
               <Input
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
                 placeholder="••••••••••"
+                minLength={6}
                 required
               />
             </Field>
 
-            <div style={styles.authLinksRow}>
-              <Link to="/forgot-password" style={styles.helperLink}>
-                Lupa password?
-              </Link>
+            <Field label="Konfirmasi Password">
+              <Input
+                type="password"
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                placeholder="••••••••••"
+                minLength={6}
+                required
+              />
+            </Field>
 
-              <Link to="/register" style={styles.helperLink}>
-                Buat akun
-              </Link>
-            </div>
-
-            {/* Login button */}
             <OvalButton type="submit" disabled={loading}>
-              {loading ? 'Memproses...' : 'Login'}
+              {loading ? 'Menyimpan...' : 'Simpan Password Baru'}
             </OvalButton>
           </form>
 
+          <p style={styles.footerText}>
+            Sudah reset password?{' '}
+            <Link to="/login" style={styles.helperLink}>
+              Masuk di sini
+            </Link>
+          </p>
         </div>
       </main>
     </div>
   );
 }
-
-/* ── Reusable sub-components ── */
 
 function Field({ label, children }) {
   return (
@@ -114,6 +111,7 @@ function Field({ label, children }) {
 
 function Input({ ...props }) {
   const [focused, setFocused] = useState(false);
+
   return (
     <input
       {...props}
@@ -128,13 +126,13 @@ function Input({ ...props }) {
   );
 }
 
-function OvalButton({ children, icon, disabled, type, onClick }) {
+function OvalButton({ children, disabled, type }) {
   const [hovered, setHovered] = useState(false);
+
   return (
     <button
       type={type}
       disabled={disabled}
-      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -144,13 +142,11 @@ function OvalButton({ children, icon, disabled, type, onClick }) {
         opacity: disabled ? 0.7 : 1,
       }}
     >
-      {icon && <span style={{ display: 'flex', alignItems: 'center' }}>{icon}</span>}
       {children}
     </button>
   );
 }
 
-/* ── Styles ── */
 const styles = {
   page: {
     minHeight: '100vh',
@@ -198,12 +194,32 @@ const styles = {
     width: '100%',
     maxWidth: '460px',
   },
+  title: {
+    margin: '0 0 8px',
+    color: '#111827',
+    fontSize: '28px',
+    fontWeight: '700',
+  },
+  subtitle: {
+    margin: '0 0 22px',
+    color: '#6b7280',
+    fontSize: '14px',
+  },
   errorBanner: {
     marginBottom: '16px',
     fontSize: '13px',
     color: '#dc2626',
     backgroundColor: '#fef2f2',
     border: '1px solid #fecaca',
+    borderRadius: '8px',
+    padding: '10px 14px',
+  },
+  successBanner: {
+    marginBottom: '16px',
+    fontSize: '13px',
+    color: '#166534',
+    backgroundColor: '#f0fdf4',
+    border: '1px solid #bbf7d0',
     borderRadius: '8px',
     padding: '10px 14px',
   },
@@ -231,19 +247,6 @@ const styles = {
     backgroundColor: '#ffffff',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   },
-  helperText: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginTop: '-4px',
-  },
-  authLinksRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '12px',
-    marginTop: '-4px',
-    fontSize: '12px',
-  },
   helperLink: {
     color: '#111827',
     fontWeight: '600',
@@ -260,7 +263,12 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '0px',
     transition: 'background-color 0.15s',
+  },
+  footerText: {
+    marginTop: '20px',
+    color: '#6b7280',
+    fontSize: '13px',
+    textAlign: 'center',
   },
 };

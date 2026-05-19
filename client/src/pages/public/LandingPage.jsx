@@ -1,16 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MapContainer,
   TileLayer,
   CircleMarker,
   Popup,
+  useMap,
 } from 'react-leaflet';
 
 import heroImage from '../../assets/orang_petani.jpeg';
+import agrosyncLogo from '../../assets/Logo_project.jpeg';
 import './LandingPage.css';
 
 const indonesiaCenter = [-2.5489, 118.0149];
+const DEFAULT_MAP_ZOOM = 5;
+const REGION_MAP_ZOOM = 17;
+const MAX_NATIVE_TILE_ZOOM = 19;
+const MAX_MAP_ZOOM = MAX_NATIVE_TILE_ZOOM;
 
 const indonesiaBounds = [
   [-11.2, 94.5],
@@ -66,7 +72,8 @@ const highlightedRegions = [
     name: 'Kabupaten Jayapura',
     province: 'Papua',
     position: [-2.53, 140.72],
-    status: 'Potensi Baru',
+    status: 'Potensi Rendah',
+    potential: 'rendah',
     color: '#7a6042',
     commodity: ['Sagu', 'Kakao'],
     production: '42.760 Ton',
@@ -104,19 +111,152 @@ const commodities = [
   { name: 'Kopi', value: '35%' },
 ];
 
+function normalizeStaticRegion(region) {
+  const potential = region.status.toLowerCase().includes('tinggi')
+    ? 'tinggi'
+    : region.status.toLowerCase().includes('sedang')
+      ? 'sedang'
+      : 'rendah';
+
+  return {
+    ...region,
+    location: region.province,
+    potential,
+  };
+}
+
+const fallbackRegions = highlightedRegions.map(normalizeStaticRegion);
+
+function LandingMapFocus({ regions }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (regions.length === 1) {
+      map.flyTo(regions[0].position, REGION_MAP_ZOOM, {
+        duration: 0.8,
+      });
+      return;
+    }
+
+    if (regions.length > 1) {
+      map.fitBounds(
+        regions.map((region) => region.position),
+        {
+          padding: [70, 70],
+          maxZoom: REGION_MAP_ZOOM,
+        },
+      );
+      return;
+    }
+
+    map.setView(indonesiaCenter, DEFAULT_MAP_ZOOM);
+  }, [map, regions]);
+
+  return null;
+}
+
 export default function LandingPage() {
   const [mapSearch, setMapSearch] = useState('');
   const [selectedCommodity, setSelectedCommodity] = useState('semua');
   const [selectedPotential, setSelectedPotential] = useState('semua');
+  const [publicLahan, setPublicLahan] = useState([]);
+  const [publicLahanLoading, setPublicLahanLoading] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadPublicLahan = async () => {
+      setPublicLahanLoading(true);
+
+      try {
+        const response = await fetch('/api/lahan/public');
+
+        if (!response.ok) {
+          throw new Error('Failed to load public lahan');
+        }
+
+        const result = await response.json();
+
+        if (!ignore) {
+          setPublicLahan(Array.isArray(result.data) ? result.data : []);
+        }
+      } catch (error) {
+        console.error('Load public lahan error:', error);
+
+        if (!ignore) {
+          setPublicLahan([]);
+        }
+      } finally {
+        if (!ignore) {
+          setPublicLahanLoading(false);
+        }
+      }
+    };
+
+    loadPublicLahan();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const mapRegions = publicLahan.length > 0 ? publicLahan : fallbackRegions;
+
+  const mapStats = useMemo(() => {
+    if (publicLahan.length === 0) return stats;
+
+    const totalLuas = publicLahan.reduce((sum, item) => {
+      const numericArea = Number(item.area_ha);
+      return Number.isNaN(numericArea) ? sum : sum + numericArea;
+    }, 0);
+
+    const uniqueCommodities = new Set(
+      publicLahan.flatMap((item) => item.commodity || []),
+    );
+    const uniqueLocations = new Set(publicLahan.map((item) => item.location));
+
+    return [
+      {
+        label: 'Total Lahan Petani',
+        value: String(publicLahan.length),
+        sub: 'Data tersinkron',
+      },
+      {
+        label: 'Luas Lahan Tercatat',
+        value: `${Number(totalLuas.toFixed(2))} ha`,
+        sub: 'Akumulasi data',
+      },
+      {
+        label: 'Komoditas Aktif',
+        value: `${uniqueCommodities.size} jenis`,
+        sub: 'Dari data petani',
+      },
+      {
+        label: 'Wilayah Terpantau',
+        value: `${uniqueLocations.size} lokasi`,
+        sub: 'Berdasarkan input lahan',
+      },
+    ];
+  }, [publicLahan]);
+
+  const mapCommodities = useMemo(() => {
+    const names = new Set();
+
+    mapRegions.forEach((region) => {
+      (region.commodity || []).forEach((item) => names.add(item));
+    });
+
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [mapRegions]);
 
   const filteredRegions = useMemo(() => {
     const keyword = mapSearch.trim().toLowerCase();
 
-    return highlightedRegions.filter((region) => {
+    return mapRegions.filter((region) => {
       const matchKeyword =
         !keyword ||
         region.name.toLowerCase().includes(keyword) ||
-        region.province.toLowerCase().includes(keyword) ||
+        region.location.toLowerCase().includes(keyword) ||
         region.commodity.some((item) => item.toLowerCase().includes(keyword));
 
       const matchCommodity =
@@ -127,11 +267,11 @@ export default function LandingPage() {
 
       const matchPotential =
         selectedPotential === 'semua' ||
-        region.status.toLowerCase().includes(selectedPotential.toLowerCase());
+        region.potential === selectedPotential;
 
       return matchKeyword && matchCommodity && matchPotential;
     });
-  }, [mapSearch, selectedCommodity, selectedPotential]);
+  }, [mapRegions, mapSearch, selectedCommodity, selectedPotential]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
@@ -153,7 +293,12 @@ export default function LandingPage() {
     <div className="landing-page">
       <header className="landing-navbar">
         <Link to="/" className="landing-logo" aria-label="Agrosync Beranda">
-          <span className="landing-logo-mark">A</span>
+          <img
+            src={agrosyncLogo}
+            alt=""
+            className="landing-logo-image"
+            aria-hidden="true"
+          />
           <span>Agrosync</span>
         </Link>
 
@@ -246,7 +391,7 @@ export default function LandingPage() {
           <h2 id="stats-title">Highlight Statistik Nasional</h2>
 
           <div className="landing-stats-grid">
-            {stats.map((item) => (
+            {mapStats.map((item) => (
               <article className="landing-stat-card" key={item.label}>
                 <div className="landing-stat-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" role="img">
@@ -277,29 +422,37 @@ export default function LandingPage() {
 
             <p>
               Peta difokuskan ke Indonesia dengan contoh titik potensi wilayah.
-              Data masih statis dan siap disambungkan ke database MANPROSI.
+              Data peta tersinkron dari input lahan petani MANPROSI.
             </p>
           </div>
 
           <div className="landing-map-card">
             <MapContainer
               center={indonesiaCenter}
-              zoom={5}
+              zoom={DEFAULT_MAP_ZOOM}
               minZoom={5}
+              maxZoom={MAX_MAP_ZOOM}
               maxBounds={indonesiaBounds}
               maxBoundsViscosity={0.85}
-              scrollWheelZoom={false}
+              scrollWheelZoom
               className="landing-map"
             >
               <TileLayer
                 attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={MAX_MAP_ZOOM}
+                maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
               />
 
               <TileLayer
-                attribution="Labels &copy; Esri"
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                attribution="Labels &copy; OpenStreetMap contributors &copy; CARTO"
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
+                subdomains={['a', 'b', 'c', 'd']}
+                maxZoom={MAX_MAP_ZOOM}
+                maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
               />
+
+              <LandingMapFocus regions={filteredRegions} />
 
               {filteredRegions.map((region) => (
                 <CircleMarker
@@ -316,7 +469,7 @@ export default function LandingPage() {
                   <Popup>
                     <div className="landing-map-popup">
                       <h3>{region.name}</h3>
-                      <p>{region.province}</p>
+                      <p>{region.location}</p>
                       <span>{region.status}</span>
 
                       <div className="landing-popup-tags">
@@ -367,12 +520,11 @@ export default function LandingPage() {
                   onChange={(event) => setSelectedCommodity(event.target.value)}
                 >
                   <option value="semua">Semua komoditas</option>
-                  <option value="Padi">Padi</option>
-                  <option value="Sayuran">Sayuran</option>
-                  <option value="Kopi">Kopi</option>
-                  <option value="Jagung">Jagung</option>
-                  <option value="Kakao">Kakao</option>
-                  <option value="Sagu">Sagu</option>
+                  {mapCommodities.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -416,19 +568,100 @@ export default function LandingPage() {
 
                 <button
                   type="button"
-                  className={selectedPotential === 'baru' ? 'is-active' : ''}
-                  onClick={() => setSelectedPotential('baru')}
+                  className={selectedPotential === 'rendah' ? 'is-active' : ''}
+                  onClick={() => setSelectedPotential('rendah')}
                 >
                   <i className="legend-low" />
-                  Baru
+                  Rendah
                 </button>
               </div>
 
               <button type="button" onClick={handleResetFilter}>
                 Reset Filter
               </button>
+
+              <p className="landing-map-source">
+                {publicLahanLoading
+                  ? 'Memuat data petani...'
+                  : publicLahan.length > 0
+                    ? `${publicLahan.length} data lahan petani tersinkron.`
+                    : 'Menampilkan data contoh karena data petani belum tersedia.'}
+              </p>
             </aside>
           </div>
+
+          <section className="landing-filter-panel" aria-label="Filter data peta">
+            <div className="landing-filter-panel-header">
+              <h3>Filter Data</h3>
+
+              <button
+                type="button"
+                className="landing-filter-caret"
+                aria-label="Buka pilihan filter"
+              >
+               ⌄
+              </button>
+            </div>
+
+            <div className="landing-filter-grid">
+              <label>
+                Pilih Wilayah
+                <input
+                  type="text"
+                  placeholder="Contoh: Bandung, Garut, Cimahi..."
+                  value={mapSearch}
+                  onChange={(event) => setMapSearch(event.target.value)}
+                />
+              </label>
+
+              <label>
+                Pilih Komoditas
+                <select
+                  value={selectedCommodity}
+                  onChange={(event) => setSelectedCommodity(event.target.value)}
+                >
+                  <option value="semua">Semua Komoditas</option>
+
+                  {mapCommodities.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Tahun Data
+                <select defaultValue="2024">
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                </select>
+              </label>
+
+              <label>
+                Tingkat Potensi
+                <select
+                  value={selectedPotential}
+                  onChange={(event) => setSelectedPotential(event.target.value)}
+                >
+                  <option value="semua">Semua</option>
+                  <option value="tinggi">Tinggi</option>
+                  <option value="sedang">Sedang</option>
+                  <option value="rendah">Rendah</option>
+                </select>
+              </label>
+
+              <button
+                type="button"
+                className="landing-filter-apply"
+                onClick={handleSearchSubmit}
+              >
+                <span aria-hidden="true">≡</span>
+                Terapkan Filter
+              </button>
+            </div>
+          </section>
         </section>
 
         <section

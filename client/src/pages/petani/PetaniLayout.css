@@ -21,13 +21,19 @@
 .petani-menu-button {
   width: 44px;
   height: 44px;
+  display: grid;
+  place-items: center;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: #111827;
-  font-size: 30px;
   line-height: 1;
   cursor: pointer;
+}
+
+.petani-menu-button svg {
+  width: 25px;
+  height: 25px;
 }
 
 .petani-menu-button:hover {
@@ -64,6 +70,11 @@
   border-radius: 999px;
   font-size: 14px;
   line-height: 1;
+}
+
+.petani-user-icon svg {
+  width: 15px;
+  height: 15px;
 }
 
 .petani-user-role {
@@ -142,8 +153,17 @@
 }
 
 .petani-sidebar-title strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #172033;
   font-size: 16px;
+}
+
+.petani-sidebar-title strong svg {
+  width: 19px;
+  height: 19px;
+  color: #315f4d;
 }
 
 .petani-sidebar-title span {
@@ -187,6 +207,19 @@
   background: #edf5f2;
   color: #315f4d;
   font-weight: 850;
+}
+
+.petani-nav-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.petani-nav-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .petani-sidebar-logout {

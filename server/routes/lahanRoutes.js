@@ -12,9 +12,6 @@ const { authorize } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
-router.use(protect);
-router.use(authorize('petani', 'pengurus'));
-
 const includeLahan = [
   {
     model: Lokasi,
@@ -111,6 +108,115 @@ function normalizePolygon(value) {
 
   return points.length >= 3 ? points : null;
 }
+
+function getLocationText(item) {
+  return (
+    item.lokasi_lahan ||
+    item.lokasi?.nama_lokasi ||
+    item.lokasi?.nama_desa ||
+    item.lokasi?.alamat ||
+    item.lokasi?.kecamatan ||
+    item.lokasi?.kabupaten ||
+    item.lokasi?.kabupaten_kota ||
+    'Lokasi belum diisi'
+  );
+}
+
+function getPotentialStatus(item) {
+  const luasHa = getAreaInHa(item);
+
+  if (luasHa >= 5) {
+    return {
+      label: 'Potensi Tinggi',
+      key: 'tinggi',
+      color: '#2f6f55',
+    };
+  }
+
+  if (luasHa >= 1) {
+    return {
+      label: 'Potensi Sedang',
+      key: 'sedang',
+      color: '#c59b4a',
+    };
+  }
+
+  return {
+    label: 'Potensi Rendah',
+    key: 'rendah',
+    color: '#7a6042',
+  };
+}
+
+function getAreaInHa(item) {
+  const luas = Number(item.luas || 0);
+  const satuan = String(item.satuan_luas || 'ha').toLowerCase();
+
+  return satuan === 'm2' || satuan === 'm²' ? luas / 10000 : luas;
+}
+
+// GET /api/lahan/public
+router.get('/public', async (req, res) => {
+  try {
+    const lahan = await Lahan.findAll({
+      where: {
+        latitude: {
+          [Op.ne]: null,
+        },
+        longitude: {
+          [Op.ne]: null,
+        },
+      },
+      include: includeLahan,
+      order: [['created_at', 'DESC']],
+      limit: 100,
+    });
+
+    const data = lahan
+      .map((item) => {
+        const latitude = Number(item.latitude);
+        const longitude = Number(item.longitude);
+
+        if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+          return null;
+        }
+
+        const komoditas = item.komoditas?.nama_komoditas || 'Belum dipilih';
+        const potential = getPotentialStatus(item);
+
+        return {
+          id: item.id_lahan,
+          name: item.nama_lahan,
+          location: getLocationText(item),
+          position: [latitude, longitude],
+          status: potential.label,
+          potential: potential.key,
+          color: potential.color,
+          commodity: [komoditas],
+          production: '-',
+          area: `${item.luas} ${item.satuan_luas || 'ha'}`,
+          area_ha: Number(getAreaInHa(item).toFixed(4)),
+          productivity: '-',
+          planting_date: item.tanggal_tanam_terakhir,
+        };
+      })
+      .filter(Boolean);
+
+    return res.json({
+      data,
+    });
+  } catch (error) {
+    console.error('Get public lahan error:', error);
+
+    return res.status(500).json({
+      message: 'Gagal mengambil data lahan publik.',
+      error: error.message,
+    });
+  }
+});
+
+router.use(protect);
+router.use(authorize('petani', 'pengurus'));
 
 // GET /api/lahan/summary
 router.get('/summary', async (req, res) => {

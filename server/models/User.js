@@ -9,6 +9,8 @@ const User = sequelize.define('User', {
   email: { type: DataTypes.STRING(100), unique: true },
   password: { type: DataTypes.STRING(255) },
   phone: { type: DataTypes.STRING(20) },
+  reset_password_token: { type: DataTypes.STRING(255), allowNull: true },
+  reset_password_expires: { type: DataTypes.DATE, allowNull: true },
 }, { tableName: 'user', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
 
 User.beforeCreate(async (user) => {

@@ -73,9 +73,16 @@
   gap: 28px;
 }
 
+.lahan-detail-column {
+  display: grid;
+  gap: 18px;
+}
+
 .lahan-map-card,
 .lahan-list-card,
-.lahan-form-card {
+.lahan-form-card,
+.lahan-detail-map-card,
+.lahan-info-card {
   border: 1px solid #e8edf2;
   border-radius: 18px;
   background: #fff;
@@ -91,6 +98,17 @@
 .lahan-map {
   width: 100%;
   height: 430px;
+  border-radius: 18px;
+}
+
+.lahan-detail-map-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.lahan-detail-map {
+  width: 100%;
+  height: 500px;
   border-radius: 18px;
 }
 
@@ -125,6 +143,19 @@
   outline: none;
 }
 
+.lahan-map-filter select:disabled {
+  opacity: 1;
+}
+
+.lahan-filter-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #5f5550;
+}
+
 .lahan-map-card small {
   position: absolute;
   left: 14px;
@@ -132,6 +163,38 @@
   z-index: 500;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.lahan-detail-map-card small {
+  position: absolute;
+  left: 14px;
+  bottom: 10px;
+  z-index: 500;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.lahan-back-button {
+  width: fit-content;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #dce5ea;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #577568;
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.lahan-back-button:hover {
+  background: #edf5f2;
+}
+
+.lahan-detail-map-meta {
+  margin: -4px 4px 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .lahan-list-card {
@@ -180,12 +243,15 @@
   padding: 12px;
   border: 1px solid transparent;
   border-radius: 16px;
+  cursor: pointer;
   transition: background 0.2s ease, border 0.2s ease;
 }
 
-.lahan-item:hover {
+.lahan-item:hover,
+.lahan-item:focus-visible {
   border-color: #e3ebef;
   background: #f8fbf9;
+  outline: none;
 }
 
 .lahan-thumb {
@@ -195,7 +261,40 @@
   place-items: center;
   border-radius: 10px;
   background: linear-gradient(135deg, #dfe9be, #4f8a5b);
-  font-size: 28px;
+  color: #f8fff4;
+  overflow: hidden;
+}
+
+.lahan-thumb.has-image {
+  padding: 4px;
+  background: #ffffff;
+}
+
+.lahan-thumb svg {
+  width: 28px;
+  height: 28px;
+}
+
+.lahan-thumb-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.lahan-thumb-image.is-jagung {
+  width: 66%;
+  height: 66%;
+}
+
+.lahan-thumb-image.is-padi {
+  width: 70%;
+  height: 70%;
+}
+
+.lahan-thumb-image.is-sayuran {
+  width: 76%;
+  height: 76%;
 }
 
 .lahan-item-title-row {
@@ -261,6 +360,10 @@
   top: 20px;
 }
 
+.lahan-detail-form-card {
+  padding-top: 28px;
+}
+
 .lahan-form-card > p {
   margin: 4px 0 20px;
   color: #91a1b4;
@@ -297,6 +400,72 @@
   padding: 0 11px;
 }
 
+.lahan-location-field {
+  display: grid;
+  gap: 7px;
+}
+
+.lahan-location-field > label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lahan-location-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px;
+  gap: 8px;
+}
+
+.lahan-location-search-row input {
+  min-width: 0;
+}
+
+.lahan-location-search-row button {
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #577568;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.lahan-location-search-row button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.lahan-location-results {
+  display: grid;
+  gap: 6px;
+  max-height: 164px;
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid #dbe3ea;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.lahan-location-results button {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lahan-location-results button:hover {
+  background: #edf5f2;
+  color: #315f4d;
+}
+
 .lahan-form-card textarea {
   resize: vertical;
   padding: 11px;
@@ -311,17 +480,6 @@
 
 .lahan-coordinate-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.lahan-pick-button {
-  height: 38px;
-  border: 0;
-  border-radius: 8px;
-  background: #c9c8c4;
-  color: #577568;
-  font-size: 12px;
-  font-weight: 850;
-  cursor: pointer;
 }
 
 .lahan-form-actions {
@@ -349,6 +507,77 @@
   cursor: not-allowed;
 }
 
+.lahan-info-card {
+  padding: 28px 32px;
+}
+
+.lahan-info-card h2 {
+  margin: 0 0 24px;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.lahan-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 34px;
+}
+
+.lahan-info-column {
+  display: grid;
+  gap: 22px;
+}
+
+.lahan-info-column + .lahan-info-column {
+  padding-left: 34px;
+  border-left: 1px solid #cfd8df;
+}
+
+.lahan-info-item {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.lahan-info-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #c9ddd6;
+  color: #315f4d;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.lahan-info-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.lahan-info-item strong,
+.lahan-info-note strong {
+  display: block;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.lahan-info-item p,
+.lahan-info-note p {
+  margin: 4px 0 0;
+  color: #7e8ea1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.lahan-info-note {
+  margin-top: 28px;
+}
+
 @media (max-width: 1100px) {
   .lahan-main-grid {
     grid-template-columns: 1fr;
@@ -356,6 +585,10 @@
 
   .lahan-form-card {
     position: static;
+  }
+
+  .lahan-detail-map {
+    height: 420px;
   }
 }
 
@@ -389,6 +622,26 @@
   .lahan-coordinate-grid {
     grid-template-columns: 1fr;
   }
+
+  .lahan-detail-map {
+    height: 360px;
+  }
+
+  .lahan-info-card {
+    padding: 22px;
+  }
+
+  .lahan-info-grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .lahan-info-column + .lahan-info-column {
+    padding-left: 0;
+    padding-top: 22px;
+    border-left: 0;
+    border-top: 1px solid #cfd8df;
+  }
 }
 
 .lahan-polygon-tools {
@@ -406,6 +659,10 @@
 
 .lahan-polygon-tools button {
   height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 12px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
