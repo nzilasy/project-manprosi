@@ -12,6 +12,7 @@ const {
 const authRoutes = require('./routes/authRoutes');
 const lahanRoutes = require('./routes/lahanRoutes');
 const komoditasRoutes = require('./routes/komoditasRoutes');
+const panenRoutes = require('./routes/panenRoutes');
 
 const { logger } = require('./middleware/loggerMiddleware');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
@@ -28,6 +29,7 @@ app.use(logger);
 app.use('/api/auth', authRoutes);
 app.use('/api/lahan', lahanRoutes);
 app.use('/api/komoditas', komoditasRoutes);
+app.use('/api/panen', panenRoutes);
 
 // Route tes dasar
 app.get('/', (req, res) => {
@@ -146,10 +148,34 @@ async function seedKomoditas() {
   console.log('Data kategori dan komoditas berhasil disinkronkan.');
 }
 
+async function repairLegacyPanenForeignKeys() {
+  const [rows] = await sequelize.query(`
+    SELECT CONSTRAINT_NAME, REFERENCED_TABLE_NAME
+    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'panen'
+      AND COLUMN_NAME = 'id_lahan'
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+      AND REFERENCED_TABLE_NAME <> 'lahan'
+  `);
+
+  for (const row of rows) {
+    await sequelize.query(
+      `ALTER TABLE \`panen\` DROP FOREIGN KEY \`${row.CONSTRAINT_NAME}\``,
+    );
+  }
+
+  if (rows.length > 0) {
+    console.log('Foreign key lama tabel panen berhasil dibersihkan.');
+  }
+}
+
 async function startServer() {
   try {
     await sequelize.authenticate();
     console.log('Koneksi database berhasil.');
+
+    await repairLegacyPanenForeignKeys();
 
     await sequelize.sync({ alter: true });
     console.log('Semua tabel tersinkronisasi.');
