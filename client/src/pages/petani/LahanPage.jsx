@@ -20,15 +20,20 @@ import sayuranImage from '../../assets/sayuran.jpeg';
 import './LahanPage.css';
 
 const DEFAULT_CENTER = [-6.9175, 107.6191];
-const MAX_NATIVE_TILE_ZOOM = 19;
+const MAX_NATIVE_TILE_ZOOM = 18;
 const MAX_MAP_ZOOM = MAX_NATIVE_TILE_ZOOM;
 const DEFAULT_MAP_ZOOM = 18;
 const SELECTED_MAP_ZOOM = MAX_MAP_ZOOM;
+const SEARCH_MAP_ZOOM = 16;
+const ESRI_ATTRIBUTION =
+  'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
+const MAP_SOURCE_TEXT = 'Sumber peta: Esri World Imagery.';
 
 const INDONESIA_BOUNDS = [
   [-11.2, 94.5],
   [6.5, 141.5],
 ];
+const VERTEX_CLICK_GUARD_PX = 28;
 
 const defaultForm = {
   nama_lahan: '',
@@ -152,7 +157,7 @@ function MapTiles() {
   return (
     <>
       <TileLayer
-        attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
+        attribution={ESRI_ATTRIBUTION}
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         maxZoom={MAX_MAP_ZOOM}
         maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
@@ -171,12 +176,25 @@ function MapTiles() {
 
 function PickLocation({
   isDrawingPolygon,
+  polygonPoints = [],
   onPick,
   onAddPolygonPoint,
 }) {
+  const map = useMap();
+
   useMapEvents({
     click(event) {
       if (isDrawingPolygon) {
+        const clickPoint = map.latLngToContainerPoint(event.latlng);
+        const isNearExistingVertex = polygonPoints.some((point) => {
+          const vertexPoint = map.latLngToContainerPoint(point);
+          return clickPoint.distanceTo(vertexPoint) <= VERTEX_CLICK_GUARD_PX;
+        });
+
+        if (isNearExistingVertex) {
+          return;
+        }
+
         onAddPolygonPoint(event.latlng);
         return;
       }
@@ -188,12 +206,12 @@ function PickLocation({
   return null;
 }
 
-function MapFocus({ focusPosition, selectedPosition }) {
+function MapFocus({ focusPosition, selectedPosition, focusZoom = SEARCH_MAP_ZOOM }) {
   const map = useMap();
 
   useEffect(() => {
     if (focusPosition) {
-      map.flyTo(focusPosition, SELECTED_MAP_ZOOM, {
+      map.flyTo(focusPosition, focusZoom, {
         duration: 0.8,
       });
       return;
@@ -201,13 +219,16 @@ function MapFocus({ focusPosition, selectedPosition }) {
 
     if (selectedPosition) {
       map.setView(selectedPosition, SELECTED_MAP_ZOOM);
-      return;
     }
-
-    map.setView(DEFAULT_CENTER, DEFAULT_MAP_ZOOM);
-  }, [map, focusPosition, selectedPosition]);
+  }, [map, focusPosition, focusZoom, selectedPosition]);
 
   return null;
+}
+
+function stopMapEvent(event) {
+  if (event.originalEvent) {
+    L.DomEvent.stop(event.originalEvent);
+  }
 }
 
 function getLocationText(item) {
@@ -394,6 +415,9 @@ export default function LahanPage() {
     );
   }, [detailId, lahan]);
 
+  const isDetailView = Boolean(selectedDetail);
+  const canClearSelectedLocation = !editingId && !isDetailView;
+
   const loadData = async () => {
     setLoading(true);
     setMessage('');
@@ -510,6 +534,27 @@ export default function LahanPage() {
     setPlaceSearchQuery(locationLabel);
     setPlaceSearchResults([]);
     setMapFocusPosition(null);
+  };
+
+  const handleClearSelectedLocation = () => {
+    if (!canClearSelectedLocation) {
+      setMessage(
+        'Lokasi lahan tersimpan tidak bisa dihapus. Klik peta untuk memindahkan titiknya.',
+      );
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      latitude: '',
+      longitude: '',
+      lokasi_lahan: '',
+    }));
+
+    setPlaceSearchQuery('');
+    setPlaceSearchResults([]);
+    setMapFocusPosition(null);
+    setMessage('Titik lokasi yang dipilih dihapus.');
   };
 
   const handleSearchPlace = async () => {
@@ -711,13 +756,29 @@ export default function LahanPage() {
     setMessage('');
 
     try {
+      const editingItem = editingId
+        ? lahan.find((item) => String(item.id_lahan) === String(editingId))
+        : null;
+      const savedLatitude = editingItem
+        ? getCoordinate(editingItem, 'latitude')
+        : '';
+      const savedLongitude = editingItem
+        ? getCoordinate(editingItem, 'longitude')
+        : '';
+      const savedLocationText = editingItem ? getLocationText(editingItem) : '';
+      const hasSavedLocationText =
+        savedLocationText && savedLocationText !== 'Lokasi belum diisi';
+      const nextLatitude = form.latitude || savedLatitude;
+      const nextLongitude = form.longitude || savedLongitude;
+
       const payload = {
         ...form,
         id_komoditas: form.id_komoditas || null,
         luas: Number(form.luas),
-        lokasi_lahan: form.lokasi_lahan || null,
-        latitude: form.latitude ? Number(form.latitude) : null,
-        longitude: form.longitude ? Number(form.longitude) : null,
+        lokasi_lahan:
+          form.lokasi_lahan || (hasSavedLocationText ? savedLocationText : null),
+        latitude: nextLatitude ? Number(nextLatitude) : null,
+        longitude: nextLongitude ? Number(nextLongitude) : null,
         polygon_lahan: polygonPoints.length >= 3 ? polygonPoints : null,
         tanggal_tanam_terakhir: form.tanggal_tanam_terakhir || null,
       };
@@ -857,12 +918,6 @@ export default function LahanPage() {
               >
                 <MapTiles />
 
-                <PickLocation
-                  isDrawingPolygon={isDrawingPolygon}
-                  onPick={handlePickLocation}
-                  onAddPolygonPoint={handleAddPolygonPoint}
-                />
-
                 <MapFocus
                   focusPosition={mapFocusPosition}
                   selectedPosition={activeMapPosition}
@@ -880,35 +935,21 @@ export default function LahanPage() {
                   />
                 )}
 
-                {polygonPoints.map((point, index) => (
-                  <Marker
-                    key={`detail-vertex-${index}`}
-                    position={point}
-                    icon={vertexIcon}
-                    draggable
-                    eventHandlers={{
-                      drag: (event) => {
-                        const latlng = event.target.getLatLng();
-                        handleMovePolygonPoint(index, latlng);
-                      },
-                      dragend: (event) => {
-                        const latlng = event.target.getLatLng();
-                        handleMovePolygonPoint(index, latlng);
-                      },
-                    }}
-                  />
-                ))}
-
                 {selectedPosition && (
                   <Marker position={selectedPosition} icon={markerIcon}>
-                    <Popup>Lokasi lahan</Popup>
+                    <Popup>
+                      <div className="lahan-selected-location-popup">
+                        <strong>Lokasi lahan</strong>
+                        <span>Detail lokasi hanya untuk dilihat.</span>
+                      </div>
+                    </Popup>
                   </Marker>
                 )}
               </MapContainer>
 
               <small>
-                Sumber peta: Esri World Imagery. Klik peta untuk memperbarui
-                titik lokasi lahan.
+                {MAP_SOURCE_TEXT} Klik peta untuk memperbarui titik lokasi
+                lahan.
               </small>
             </div>
 
@@ -1037,6 +1078,7 @@ export default function LahanPage() {
 
               <PickLocation
                 isDrawingPolygon={isDrawingPolygon}
+                polygonPoints={polygonPoints}
                 onPick={handlePickLocation}
                 onAddPolygonPoint={handleAddPolygonPoint}
               />
@@ -1098,6 +1140,10 @@ export default function LahanPage() {
                   icon={vertexIcon}
                   draggable
                   eventHandlers={{
+                    mousedown: stopMapEvent,
+                    click: stopMapEvent,
+                    dblclick: stopMapEvent,
+                    dragstart: stopMapEvent,
                     drag: (event) => {
                       const latlng = event.target.getLatLng();
                       handleMovePolygonPoint(index, latlng);
@@ -1138,15 +1184,46 @@ export default function LahanPage() {
 
               {/* Marker lokasi yang sedang dipilih */}
               {selectedPosition && (
-                <Marker position={selectedPosition} icon={markerIcon}>
-                  <Popup>Lokasi yang dipilih</Popup>
+                <Marker
+                  position={selectedPosition}
+                  icon={markerIcon}
+                  draggable={Boolean(editingId)}
+                  eventHandlers={
+                    editingId
+                      ? {
+                          dragend: (event) => {
+                            handlePickLocation(event.target.getLatLng());
+                          },
+                        }
+                      : undefined
+                  }
+                >
+                  <Popup>
+                    <div className="lahan-selected-location-popup">
+                      <strong>
+                        {editingId ? 'Lokasi lahan' : 'Lokasi yang dipilih'}
+                      </strong>
+                      {canClearSelectedLocation ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleClearSelectedLocation();
+                          }}
+                        >
+                          Hapus lokasi
+                        </button>
+                      ) : (
+                        <span>Klik peta untuk memindahkan lokasi.</span>
+                      )}
+                    </div>
+                  </Popup>
                 </Marker>
               )}
             </MapContainer>
 
             <small>
-              Sumber peta: Esri World Imagery. Klik peta untuk memilih lokasi
-              lahan.
+              {MAP_SOURCE_TEXT} Klik peta untuk memilih lokasi lahan.
             </small>
           </div>
 
@@ -1325,16 +1402,18 @@ export default function LahanPage() {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault();
+                      if (isDetailView) return;
                       handleSearchPlace();
                     }
                   }}
+                  disabled={isDetailView}
                   placeholder="Cari patokan tempat, desa, atau jalan"
                 />
 
                 <button
                   type="button"
                   onClick={handleSearchPlace}
-                  disabled={placeSearchLoading}
+                  disabled={isDetailView || placeSearchLoading}
                 >
                   {placeSearchLoading ? '...' : 'Cari'}
                 </button>
@@ -1362,6 +1441,7 @@ export default function LahanPage() {
                   name="latitude"
                   value={form.latitude}
                   onChange={handleChange}
+                  disabled={isDetailView}
                   placeholder="-6.9175"
                 />
               </label>
@@ -1372,6 +1452,7 @@ export default function LahanPage() {
                   name="longitude"
                   value={form.longitude}
                   onChange={handleChange}
+                  disabled={isDetailView}
                   placeholder="107.6191"
                 />
               </label>

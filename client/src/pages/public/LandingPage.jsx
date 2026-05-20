@@ -14,9 +14,11 @@ import './LandingPage.css';
 
 const indonesiaCenter = [-2.5489, 118.0149];
 const DEFAULT_MAP_ZOOM = 5;
-const REGION_MAP_ZOOM = 17;
-const MAX_NATIVE_TILE_ZOOM = 19;
+const MAX_NATIVE_TILE_ZOOM = 18;
 const MAX_MAP_ZOOM = MAX_NATIVE_TILE_ZOOM;
+const REGION_MAP_ZOOM = MAX_MAP_ZOOM;
+const ESRI_ATTRIBUTION =
+  'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
 
 const indonesiaBounds = [
   [-11.2, 94.5],
@@ -438,7 +440,7 @@ export default function LandingPage() {
               className="landing-map"
             >
               <TileLayer
-                attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
+                attribution={ESRI_ATTRIBUTION}
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                 maxZoom={MAX_MAP_ZOOM}
                 maxNativeZoom={MAX_NATIVE_TILE_ZOOM}

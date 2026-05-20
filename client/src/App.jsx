@@ -18,6 +18,7 @@ import { NotFoundPage, UnauthorizedPage } from './pages/ErrorPages';
 
 import PetaniDashboard from './pages/petani/DashboardPage';
 import LahanPage from './pages/petani/LahanPage';
+import PanenPage from './pages/petani/PanenPage';
 
 import PengurusDashboard from './pages/pengurus/DashboardPage';
 import MasyarakatDashboard from './pages/masyarakat/DashboardPage';
@@ -44,6 +45,7 @@ export default function App() {
               <Route element={<PetaniLayout />}>
                 <Route path="/petani/dashboard" element={<PetaniDashboard />} />
                 <Route path="/petani/lahan" element={<LahanPage />} />
+                <Route path="/petani/panen" element={<PanenPage />} />
               </Route>
             </Route>
 
