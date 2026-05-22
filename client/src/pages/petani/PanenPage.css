@@ -514,7 +514,7 @@
 
 .panen-history-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px 120px 150px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
   align-items: center;
   gap: 16px;
   padding: 14px;
@@ -534,11 +534,34 @@
   font-size: 12px;
 }
 
-.panen-history-item > span {
-  color: #334155;
+.panen-history-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.panen-history-metrics div {
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.panen-history-metrics dt {
+  color: #7f8ea3;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.panen-history-metrics dd {
+  margin: 0;
+  color: #172033;
   font-size: 13px;
-  font-weight: 800;
-  text-align: right;
+  font-weight: 900;
 }
 
 .panen-empty-state {
@@ -569,8 +592,8 @@
     grid-template-columns: 1fr;
   }
 
-  .panen-history-item > span {
-    text-align: left;
+  .panen-history-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -598,5 +621,9 @@
 
   .panen-form-actions button {
     width: 100%;
+  }
+
+  .panen-history-metrics {
+    grid-template-columns: 1fr;
   }
 }

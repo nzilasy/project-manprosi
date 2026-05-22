@@ -8,6 +8,7 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
+import { useLocation, useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 
 import { lahanService } from '../../services/lahanService';
@@ -21,10 +22,10 @@ import './LahanPage.css';
 
 const DEFAULT_CENTER = [-6.9175, 107.6191];
 const MAX_NATIVE_TILE_ZOOM = 18;
-const MAX_MAP_ZOOM = MAX_NATIVE_TILE_ZOOM;
+const MAX_MAP_ZOOM = 20;
 const DEFAULT_MAP_ZOOM = 18;
 const SELECTED_MAP_ZOOM = MAX_MAP_ZOOM;
-const SEARCH_MAP_ZOOM = 16;
+const SEARCH_MAP_ZOOM = MAX_MAP_ZOOM;
 const ESRI_ATTRIBUTION =
   'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
 const MAP_SOURCE_TEXT = 'Sumber peta: Esri World Imagery.';
@@ -372,6 +373,8 @@ function DetailInfoItem({ icon, label, value, children }) {
 }
 
 export default function LahanPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [lahan, setLahan] = useState([]);
   const [komoditas, setKomoditas] = useState([]);
   const [form, setForm] = useState(defaultForm);
@@ -388,6 +391,10 @@ export default function LahanPage() {
   const [placeSearchResults, setPlaceSearchResults] = useState([]);
   const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
   const [mapFocusPosition, setMapFocusPosition] = useState(null);
+
+  const requestedDetailId = useMemo(() => {
+    return new URLSearchParams(location.search).get('detail');
+  }, [location.search]);
 
   const selectedPosition = useMemo(() => {
     if (!form.latitude || !form.longitude) return null;
@@ -488,6 +495,28 @@ export default function LahanPage() {
     setPlaceSearchResults([]);
     setMapFocusPosition(null);
   };
+
+  useEffect(() => {
+    if (!requestedDetailId || lahan.length === 0) {
+      return;
+    }
+
+    const target = lahan.find(
+      (item) => String(item.id_lahan) === String(requestedDetailId),
+    );
+
+    if (!target) {
+      setMessage('Data lahan yang dipilih tidak ditemukan.');
+      navigate('/petani/lahan', { replace: true });
+      return;
+    }
+
+    if (String(detailId) !== String(requestedDetailId)) {
+      setDetailId(target.id_lahan);
+      syncEditorWithItem(target);
+      setMessage('');
+    }
+  }, [requestedDetailId, lahan, detailId, navigate]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -636,18 +665,21 @@ export default function LahanPage() {
   const handleViewDetail = (item) => {
     setDetailId(item.id_lahan);
     syncEditorWithItem(item);
+    navigate(`/petani/lahan?detail=${item.id_lahan}`, { replace: false });
     setMessage('');
   };
 
   const handleBackToList = () => {
     setDetailId(null);
     resetEditorState();
+    navigate('/petani/lahan', { replace: true });
     setMessage('');
   };
 
   const handleAddNew = () => {
     setDetailId(null);
     resetEditorState();
+    navigate('/petani/lahan', { replace: true });
     setMessage('');
   };
 
