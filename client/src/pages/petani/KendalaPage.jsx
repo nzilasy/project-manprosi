@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { lahanService } from '../../services/lahanService';
 import { komoditasService } from '../../services/komoditasService';
 import { panenService } from '../../services/panenService';
+import { laporanService } from '../../services/laporanService';
 import jagungImage from '../../assets/jagung.jpeg';
 import kopiImage from '../../assets/kopi.jpeg';
 import padiImage from '../../assets/padi.jpeg';
 import sayuranImage from '../../assets/sayuran.jpeg';
-import './PanenPage.css';
+import './KendalaPage.css';
 
 const commodityImages = [
   { keyword: 'jagung', src: jagungImage, className: 'is-jagung' },
@@ -15,29 +16,24 @@ const commodityImages = [
   { keyword: 'sayur', src: sayuranImage, className: 'is-sayuran' },
 ];
 
-function createDefaultForm() {
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - 10);
+const categories = [
+  'Hama dan Penyakit',
+  'Irigasi',
+  'Cuaca Ekstrem',
+  'Pupuk dan Nutrisi',
+  'Kerusakan Lahan',
+  'Lainnya',
+];
 
+function createDefaultForm() {
   return {
     id_lahan: '',
-    id_komoditas: '',
-    tanggal_mulai_periode: toInputDate(start),
-    tanggal_selesai_periode: toInputDate(today),
-    luas_panen: '',
-    satuan_luas_panen: 'ha',
-    jumlah: '',
-    satuan: 'ton',
-    kadar_air: '',
-    kualitas: 'Premium',
-    harga_jual: '',
-    keterangan: '',
+    kategori: '',
+    tingkat_keparahan: 'tinggi',
+    deskripsi: '',
+    tanggal: new Date().toISOString().slice(0, 10),
+    lokasi_kendala: '',
   };
-}
-
-function toInputDate(date) {
-  return date.toISOString().slice(0, 10);
 }
 
 function formatNumber(value, fractionDigits = 2) {
@@ -111,7 +107,7 @@ function getApiErrorMessage(error, fallback) {
   return error.response.data?.error || error.response.data?.message || fallback;
 }
 
-function PanenIcon({ name, size = 18 }) {
+function KendalaIcon({ name, size = 18 }) {
   const commonProps = {
     viewBox: '0 0 24 24',
     fill: 'none',
@@ -125,12 +121,31 @@ function PanenIcon({ name, size = 18 }) {
   };
 
   const icons = {
+    alert: (
+      <svg {...commonProps}>
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+        <path d="m10.3 4.2-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-2.8l-8-14a2 2 0 0 0-3.4 0Z" />
+      </svg>
+    ),
     calendar: (
       <svg {...commonProps}>
         <path d="M8 2v4" />
         <path d="M16 2v4" />
         <rect x="3" y="5" width="18" height="16" rx="3" />
         <path d="M3 10h18" />
+      </svg>
+    ),
+    location: (
+      <svg {...commonProps}>
+        <path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Z" />
+        <circle cx="12" cy="9" r="2.5" />
+      </svg>
+    ),
+    send: (
+      <svg {...commonProps}>
+        <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+        <path d="M22 2 11 13" />
       </svg>
     ),
     upload: (
@@ -169,17 +184,19 @@ function PanenIcon({ name, size = 18 }) {
   return icons[name] || null;
 }
 
-export default function PanenPage() {
+export default function KendalaPage() {
   const fileInputRef = useRef(null);
   const objectUrlsRef = useRef([]);
 
   const [lahan, setLahan] = useState([]);
   const [komoditas, setKomoditas] = useState([]);
   const [panen, setPanen] = useState([]);
+  const [laporan, setLaporan] = useState([]);
   const [form, setForm] = useState(createDefaultForm);
   const [photoPreviews, setPhotoPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -191,21 +208,22 @@ export default function PanenPage() {
       setError('');
 
       try {
-        const [lahanResponse, komoditasResponse, panenResponse] =
+        const [lahanResponse, komoditasResponse, panenResponse, laporanResponse] =
           await Promise.all([
             lahanService.getAll(),
             komoditasService.getAll(),
             panenService.getAll({ limit: 30 }),
+            laporanService.getAll({ limit: 20 }),
           ]);
 
         if (!active) return;
 
         const nextLahan = lahanResponse.data.data || [];
-        const nextKomoditas = komoditasResponse.data.data || [];
 
         setLahan(nextLahan);
-        setKomoditas(nextKomoditas);
+        setKomoditas(komoditasResponse.data.data || []);
         setPanen(panenResponse.data.data || []);
+        setLaporan(laporanResponse.data.data || []);
 
         if (nextLahan.length > 0) {
           const firstLahan = nextLahan[0];
@@ -213,12 +231,8 @@ export default function PanenPage() {
           setForm((current) => ({
             ...current,
             id_lahan: current.id_lahan || String(firstLahan.id_lahan),
-            id_komoditas:
-              current.id_komoditas ||
-              (firstLahan.id_komoditas ? String(firstLahan.id_komoditas) : ''),
-            luas_panen: current.luas_panen || String(firstLahan.luas || ''),
-            satuan_luas_panen:
-              current.satuan_luas_panen || firstLahan.satuan_luas || 'ha',
+            lokasi_kendala:
+              current.lokasi_kendala || getLocationText(firstLahan),
           }));
         }
       } catch (err) {
@@ -227,7 +241,7 @@ export default function PanenPage() {
         setError(
           getApiErrorMessage(
             err,
-            'Gagal memuat data lahan dan riwayat panen.',
+            'Gagal memuat data lahan, panen, dan laporan kendala.',
           ),
         );
       } finally {
@@ -256,35 +270,40 @@ export default function PanenPage() {
 
   const selectedKomoditas = useMemo(() => {
     return komoditas.find(
-      (item) => String(item.id_komoditas) === String(form.id_komoditas),
+      (item) => String(item.id_komoditas) === String(selectedLahan?.id_komoditas),
     );
-  }, [form.id_komoditas, komoditas]);
+  }, [selectedLahan?.id_komoditas, komoditas]);
 
   const selectedCommodityName =
     selectedKomoditas?.nama_komoditas || getCommodityName(selectedLahan);
   const selectedCommodityImage = getCommodityImage(selectedCommodityName);
 
-  const productivity = useMemo(() => {
-    return calculateProductivity(form.jumlah, form.luas_panen);
-  }, [form.jumlah, form.luas_panen]);
-
-  const selectedHistory = useMemo(() => {
-    if (!form.id_lahan) return panen;
-
-    return panen.filter((item) => {
+  const latestPanen = useMemo(() => {
+    return panen.find((item) => {
       const idLahan = item.id_lahan || item.lahan?.id_lahan;
       return String(idLahan) === String(form.id_lahan);
     });
   }, [form.id_lahan, panen]);
 
-  const periodLabel = `${formatShortDate(
-    form.tanggal_mulai_periode,
-  )} - ${formatShortDate(form.tanggal_selesai_periode)}`;
-
+  const productivity =
+    latestPanen?.produktivitas ||
+    calculateProductivity(latestPanen?.jumlah, latestPanen?.luas_panen);
+  const periodLabel = latestPanen
+    ? `${formatShortDate(latestPanen.tanggal_mulai_periode)} - ${formatShortDate(
+        latestPanen.tanggal_selesai_periode || latestPanen.tanggal_panen,
+      )}`
+    : 'Periode ini';
   const seasonYear =
-    form.tanggal_selesai_periode?.slice(0, 4) ||
-    form.tanggal_mulai_periode?.slice(0, 4) ||
+    latestPanen?.tanggal_panen?.slice(0, 4) ||
+    form.tanggal?.slice(0, 4) ||
     new Date().getFullYear();
+
+  const selectedReports = useMemo(() => {
+    return laporan.filter((item) => {
+      const idLahan = item.reportable_id || item.lahan?.id_lahan;
+      return String(idLahan) === String(form.id_lahan);
+    });
+  }, [form.id_lahan, laporan]);
 
   const handleChange = (field, value) => {
     setForm((current) => ({
@@ -299,14 +318,7 @@ export default function PanenPage() {
     setForm((current) => ({
       ...current,
       id_lahan: value,
-      id_komoditas: nextLahan?.id_komoditas
-        ? String(nextLahan.id_komoditas)
-        : current.id_komoditas,
-      luas_panen:
-        nextLahan?.luas !== undefined && nextLahan?.luas !== null
-          ? String(nextLahan.luas)
-          : current.luas_panen,
-      satuan_luas_panen: nextLahan?.satuan_luas || current.satuan_luas_panen,
+      lokasi_kendala: nextLahan ? getLocationText(nextLahan) : current.lokasi_kendala,
     }));
   };
 
@@ -341,6 +353,36 @@ export default function PanenPage() {
     setPhotoPreviews((current) => current.filter((item) => item.url !== url));
   };
 
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Browser tidak mendukung akses lokasi.');
+      return;
+    }
+
+    setLocating(true);
+    setError('');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setForm((current) => ({
+          ...current,
+          lokasi_kendala: `${position.coords.latitude.toFixed(
+            6,
+          )}, ${position.coords.longitude.toFixed(6)}`,
+        }));
+        setLocating(false);
+      },
+      () => {
+        setError('Gagal mengambil lokasi saat ini.');
+        setLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+      },
+    );
+  };
+
   const resetForm = () => {
     const nextForm = createDefaultForm();
     const firstLahan = selectedLahan || lahan[0];
@@ -350,11 +392,7 @@ export default function PanenPage() {
     setForm({
       ...nextForm,
       id_lahan: firstLahan ? String(firstLahan.id_lahan) : '',
-      id_komoditas: firstLahan?.id_komoditas
-        ? String(firstLahan.id_komoditas)
-        : '',
-      luas_panen: firstLahan?.luas ? String(firstLahan.luas) : '',
-      satuan_luas_panen: firstLahan?.satuan_luas || 'ha',
+      lokasi_kendala: firstLahan ? getLocationText(firstLahan) : '',
     });
   };
 
@@ -364,7 +402,7 @@ export default function PanenPage() {
     setError('');
 
     if (!form.id_lahan) {
-      setError('Pilih lahan terlebih dahulu sebelum menyimpan data panen.');
+      setError('Pilih lahan terlebih dahulu sebelum menyimpan laporan.');
       return;
     }
 
@@ -373,54 +411,52 @@ export default function PanenPage() {
     try {
       const payload = {
         id_lahan: Number(form.id_lahan),
-        id_komoditas: form.id_komoditas ? Number(form.id_komoditas) : null,
-        tanggal_mulai_periode: form.tanggal_mulai_periode,
-        tanggal_selesai_periode: form.tanggal_selesai_periode,
-        tanggal_panen: form.tanggal_selesai_periode,
-        luas_panen: form.luas_panen,
-        satuan_luas_panen: form.satuan_luas_panen,
-        jumlah: form.jumlah,
-        satuan: form.satuan,
-        produktivitas: productivity ? productivity.toFixed(2) : null,
-        kadar_air: form.kadar_air,
-        kualitas: form.kualitas,
-        harga_jual: form.harga_jual,
-        foto_panen: photoPreviews.map((item) => item.name),
-        keterangan: form.keterangan,
+        kategori: form.kategori,
+        tingkat_keparahan: form.tingkat_keparahan,
+        judul: form.deskripsi.slice(0, 140),
+        deskripsi: form.deskripsi,
+        tanggal: form.tanggal,
+        lokasi_kendala: form.lokasi_kendala,
+        lampiran: photoPreviews.map((item) => item.name),
       };
 
-      const { data } = await panenService.create(payload);
+      const { data } = await laporanService.create(payload);
 
-      setPanen((current) => [data.data, ...current]);
-      setMessage(data.message || 'Data panen berhasil disimpan.');
+      setLaporan((current) => [data.data, ...current]);
+      setMessage(data.message || 'Laporan kendala berhasil disimpan.');
       resetForm();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Gagal menyimpan data panen.'));
+      setError(getApiErrorMessage(err, 'Gagal menyimpan laporan kendala.'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="panen-page-shell">
-      <header className="panen-page-header">
+    <div className="kendala-page-shell">
+      <header className="kendala-page-header">
         <div>
-          <h1>Hasil Panen</h1>
-          <p>Laporkan hasil panen Anda per periode panen.</p>
+          <h1>Lapor Kendala / Permasalahan</h1>
+          <p>
+            Laporkan kendala atau permasalahan yang Anda hadapi terkait lahan
+            pertanian.
+          </p>
         </div>
       </header>
 
-      {message && <div className="panen-message is-success">{message}</div>}
-      {error && <div className="panen-message is-error">{error}</div>}
+      {message && <div className="kendala-message is-success">{message}</div>}
+      {error && <div className="kendala-message is-error">{error}</div>}
 
-      <section className="panen-layout-grid">
-        <article className="panen-form-card">
-          <h2>Form Input Hasil Panen</h2>
+      <section className="kendala-layout-grid">
+        <article className="kendala-form-card">
+          <h2>Form Pelaporan Kendala</h2>
 
           <form onSubmit={handleSubmit}>
-            <div className="panen-form-grid">
+            <div className="kendala-form-grid">
               <label>
-                <span>Pilih Lahan <b>*</b></span>
+                <span>
+                  Pilih Lahan <b>*</b>
+                </span>
                 <select
                   value={form.id_lahan}
                   onChange={(event) => handleLahanChange(event.target.value)}
@@ -428,11 +464,11 @@ export default function PanenPage() {
                   required
                 >
                   {lahan.length === 0 ? (
-                    <option value="">Belum ada lahan</option>
+                    <option value="">Belum ada data lahan</option>
                   ) : (
                     lahan.map((item) => (
                       <option key={item.id_lahan} value={item.id_lahan}>
-                        {item.nama_lahan}
+                        {item.nama_lahan} - {getCommodityName(item)}
                       </option>
                     ))
                   )}
@@ -440,165 +476,111 @@ export default function PanenPage() {
               </label>
 
               <label>
-                <span>Komoditas <b>*</b></span>
+                <span>
+                  Kategori Kendala <b>*</b>
+                </span>
                 <select
-                  value={form.id_komoditas}
-                  onChange={(event) =>
-                    handleChange('id_komoditas', event.target.value)
-                  }
+                  value={form.kategori}
+                  onChange={(event) => handleChange('kategori', event.target.value)}
                   required
                 >
-                  <option value="">Pilih komoditas</option>
-                  {komoditas.map((item) => (
-                    <option key={item.id_komoditas} value={item.id_komoditas}>
-                      {item.nama_komoditas}
+                  <option value="">Pilih kategori kendala</option>
+                  {categories.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
                     </option>
                   ))}
                 </select>
               </label>
+            </div>
 
-              <label>
-                <span>Periode Panen <b>*</b></span>
-                <div className="panen-period-input">
-                  <input
-                    type="date"
-                    value={form.tanggal_mulai_periode}
-                    onChange={(event) =>
-                      handleChange('tanggal_mulai_periode', event.target.value)
-                    }
-                    required
-                  />
-                  <span>-</span>
-                  <input
-                    type="date"
-                    value={form.tanggal_selesai_periode}
-                    onChange={(event) =>
-                      handleChange('tanggal_selesai_periode', event.target.value)
-                    }
-                    required
-                  />
-                  <PanenIcon name="calendar" />
-                </div>
-              </label>
-
-              <label>
-                <span>Luas Panen <b>*</b></span>
-                <div className="panen-addon-input">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.luas_panen}
-                    onChange={(event) =>
-                      handleChange('luas_panen', event.target.value)
-                    }
-                    required
-                  />
-                  <select
-                    value={form.satuan_luas_panen}
-                    onChange={(event) =>
-                      handleChange('satuan_luas_panen', event.target.value)
-                    }
-                  >
-                    <option value="ha">ha</option>
-                    <option value="m2">m2</option>
-                  </select>
-                </div>
-              </label>
-
-              <label>
-                <span>Hasil Panen <b>*</b></span>
-                <div className="panen-addon-input">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.jumlah}
-                    onChange={(event) => handleChange('jumlah', event.target.value)}
-                    required
-                  />
-                  <select
-                    value={form.satuan}
-                    onChange={(event) => handleChange('satuan', event.target.value)}
-                  >
-                    <option value="ton">ton</option>
-                    <option value="kg">kg</option>
-                    <option value="kwintal">kwintal</option>
-                  </select>
-                </div>
-              </label>
-
-              <label>
-                <span>Produktivitas</span>
-                <input
-                  type="text"
-                  value={`${formatNumber(productivity)} ${form.satuan}/ha`}
-                  readOnly
+            <label className="kendala-wide-field">
+              <span>
+                Judul Kendala <b>*</b>
+              </span>
+              <div className="kendala-textarea-wrap">
+                <textarea
+                  rows="5"
+                  maxLength={1000}
+                  value={form.deskripsi}
+                  onChange={(event) => handleChange('deskripsi', event.target.value)}
+                  placeholder="Jelaskan kendala atau permasalahan yang Anda alami secara detail..."
+                  required
                 />
-              </label>
+                <small>{form.deskripsi.length}/1000</small>
+              </div>
+            </label>
 
+            <div className="kendala-form-grid">
               <label>
-                <span>Kadar Air (%)</span>
-                <div className="panen-addon-input compact-addon">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.kadar_air}
+                <span>
+                  Tingkat Keparahan <b>*</b>
+                </span>
+                <div className="kendala-icon-input">
+                  <KendalaIcon name="alert" />
+                  <select
+                    value={form.tingkat_keparahan}
                     onChange={(event) =>
-                      handleChange('kadar_air', event.target.value)
+                      handleChange('tingkat_keparahan', event.target.value)
                     }
-                  />
-                  <span>%</span>
+                    required
+                  >
+                    <option value="tinggi">Tinggi</option>
+                    <option value="sedang">Sedang</option>
+                    <option value="rendah">Rendah</option>
+                  </select>
                 </div>
               </label>
 
               <label>
-                <span>Kualitas</span>
-                <select
-                  value={form.kualitas}
-                  onChange={(event) => handleChange('kualitas', event.target.value)}
-                >
-                  <option value="Premium">Premium</option>
-                  <option value="Baik">Baik</option>
-                  <option value="Sedang">Sedang</option>
-                  <option value="Perlu Sortir">Perlu Sortir</option>
-                </select>
-              </label>
-
-              <label>
-                <span>Harga Jual (Opsional)</span>
-                <div className="panen-addon-input price-addon">
+                <span>
+                  Tanggal Kejadian <b>*</b>
+                </span>
+                <div className="kendala-icon-input">
+                  <KendalaIcon name="calendar" />
                   <input
-                    type="number"
-                    min="0"
-                    step="100"
-                    value={form.harga_jual}
-                    onChange={(event) =>
-                      handleChange('harga_jual', event.target.value)
-                    }
+                    type="date"
+                    value={form.tanggal}
+                    onChange={(event) => handleChange('tanggal', event.target.value)}
+                    required
                   />
-                  <span>Rp/kg</span>
                 </div>
               </label>
             </div>
 
-            <label className="panen-wide-field">
-              <span>Catatan (Opsional)</span>
-              <textarea
-                rows="3"
-                value={form.keterangan}
-                onChange={(event) => handleChange('keterangan', event.target.value)}
-                placeholder="Tambahkan catatan mengenai hasil panen ini..."
-              />
+            <label className="kendala-wide-field">
+              <span>Lokasi Kendala</span>
+              <div className="kendala-location-row">
+                <div className="kendala-icon-input">
+                  <KendalaIcon name="location" />
+                  <input
+                    type="text"
+                    value={form.lokasi_kendala}
+                    onChange={(event) =>
+                      handleChange('lokasi_kendala', event.target.value)
+                    }
+                    placeholder="Cihareang, Kec. Cimahi, Kab. Kuningan, Jawa Barat"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  className="kendala-location-button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locating}
+                >
+                  <KendalaIcon name="send" />
+                  {locating ? 'Mengambil lokasi...' : 'Gunakan Lokasi saya'}
+                </button>
+              </div>
             </label>
 
-            <div className="panen-photo-field">
+            <div className="kendala-photo-field">
               <span>Lampiran Foto (Opsional)</span>
 
-              <div className="panen-photo-list">
+              <div className="kendala-photo-list">
                 {photoPreviews.map((item) => (
-                  <div className="panen-photo-preview" key={item.url}>
+                  <div className="kendala-photo-preview" key={item.url}>
                     <img src={item.url} alt="" />
                     <button
                       type="button"
@@ -613,11 +595,11 @@ export default function PanenPage() {
                 {photoPreviews.length < 4 && (
                   <button
                     type="button"
-                    className="panen-photo-upload"
+                    className="kendala-photo-upload"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <PanenIcon name="upload" size={24} />
-                    <span>Tambah Foto</span>
+                    <KendalaIcon name="upload" size={26} />
+                    Tambah Foto
                   </button>
                 )}
               </div>
@@ -632,25 +614,25 @@ export default function PanenPage() {
               />
             </div>
 
-            <div className="panen-form-actions">
+            <div className="kendala-form-actions">
               <button type="button" className="secondary" onClick={resetForm}>
                 Batal
               </button>
               <button type="submit" disabled={saving || lahan.length === 0}>
-                {saving ? 'Menyimpan...' : 'Simpan Data Panen'}
+                {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>
             </div>
           </form>
         </article>
 
-        <aside className="panen-side-column">
-          <article className="panen-summary-card">
+        <aside className="kendala-side-column">
+          <article className="kendala-summary-card">
             <h2>Ringkasan Lahan</h2>
 
             {selectedLahan ? (
               <>
-                <div className="panen-land-summary">
-                  <div className="panen-land-image">
+                <div className="kendala-land-summary">
+                  <div className="kendala-land-image">
                     {selectedCommodityImage ? (
                       <img
                         src={selectedCommodityImage.src}
@@ -658,7 +640,7 @@ export default function PanenPage() {
                         className={selectedCommodityImage.className}
                       />
                     ) : (
-                      <PanenIcon name="harvest" size={30} />
+                      <KendalaIcon name="harvest" size={30} />
                     )}
                   </div>
 
@@ -670,8 +652,8 @@ export default function PanenPage() {
                     <span
                       className={
                         selectedLahan.status === 'aktif'
-                          ? 'panen-status is-active'
-                          : 'panen-status'
+                          ? 'kendala-status is-active'
+                          : 'kendala-status'
                       }
                     >
                       {selectedLahan.status || 'aktif'}
@@ -679,7 +661,7 @@ export default function PanenPage() {
                   </div>
                 </div>
 
-                <dl className="panen-detail-list">
+                <dl className="kendala-detail-list">
                   <div>
                     <dt>Luas Lahan</dt>
                     <dd>
@@ -698,118 +680,61 @@ export default function PanenPage() {
                 </dl>
               </>
             ) : (
-              <p className="panen-empty-text">
+              <p className="kendala-empty-text">
                 Buat data lahan terlebih dahulu di menu Kelola Lahan.
               </p>
             )}
           </article>
 
-          <article className="panen-summary-card">
+          <article className="kendala-summary-card">
             <h2>
               Ringkasan Panen <span>{periodLabel}</span>
             </h2>
 
-            <div className="panen-metric-grid">
+            <div className="kendala-metric-grid">
               <MetricCard
                 icon="area"
                 label="Luas Panen"
-                value={`${form.luas_panen || '0'} ${form.satuan_luas_panen}`}
+                value={`${latestPanen?.luas_panen || selectedLahan?.luas || '0'} ${
+                  latestPanen?.satuan_luas_panen || selectedLahan?.satuan_luas || 'ha'
+                }`}
               />
               <MetricCard
                 icon="harvest"
                 label="Hasil Panen"
-                value={`${form.jumlah || '0'} ${form.satuan}`}
+                value={`${latestPanen?.jumlah || '0'} ${latestPanen?.satuan || 'ton'}`}
               />
               <MetricCard
                 icon="chart"
                 label="Produktivitas"
-                value={`${formatNumber(productivity)} ${form.satuan}/ha`}
+                value={`${formatNumber(productivity)} ${latestPanen?.satuan || 'ton'}/ha`}
               />
               <MetricCard
                 icon="water"
                 label="Rata-rata Kadar Air"
-                value={`${form.kadar_air || '0'}%`}
+                value={`${latestPanen?.kadar_air || '0'}%`}
               />
             </div>
           </article>
 
-          <article className="panen-tip-card">
-            <h2>Tips Petani</h2>
-            <p>
-              Pastikan kadar air gabah saat panen berkisar antara 14-20% untuk
-              mendapatkan kualitas terbaik.
-            </p>
-            <button type="button">Lihat Tips Lainnya</button>
+          <article className="kendala-summary-card">
+            <h2>Riwayat Kendala</h2>
+            <div className="kendala-report-list">
+              {selectedReports.length === 0 ? (
+                <p className="kendala-empty-text">
+                  Belum ada laporan kendala untuk lahan ini.
+                </p>
+              ) : (
+                selectedReports.slice(0, 3).map((item) => (
+                  <div className="kendala-report-item" key={item.id_laporan}>
+                    <strong>{item.kategori || 'Kendala'}</strong>
+                    <span>{formatShortDate(item.tanggal)}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </article>
         </aside>
-      </section>
-
-      <section className="panen-history-card">
-        <div className="panen-history-header">
-          <div>
-            <h2>Riwayat Panen Per Periode</h2>
-            <p>{selectedLahan ? selectedLahan.nama_lahan : 'Semua lahan'}</p>
-          </div>
-          <span>{selectedHistory.length} data</span>
-        </div>
-
-        {selectedHistory.length === 0 ? (
-          <div className="panen-empty-state">
-            Belum ada riwayat panen untuk lahan ini.
-          </div>
-        ) : (
-          <div className="panen-history-list">
-            {selectedHistory.map((item) => {
-              const historyLahan = item.lahan || item.Lahan || selectedLahan;
-              const historyKomoditas =
-                item.komoditas?.nama_komoditas ||
-                item.Komoditas?.nama_komoditas ||
-                getCommodityName(historyLahan);
-              const itemProductivity =
-                item.produktivitas ||
-                calculateProductivity(item.jumlah, item.luas_panen);
-
-              return (
-                <article className="panen-history-item" key={item.id_panen}>
-                  <div>
-                    <strong>
-                      {historyLahan?.nama_lahan || 'Lahan'} - {historyKomoditas}
-                    </strong>
-                    <p>
-                      {formatShortDate(item.tanggal_mulai_periode)} -{' '}
-                      {formatShortDate(
-                        item.tanggal_selesai_periode || item.tanggal_panen,
-                      )}
-                    </p>
-                  </div>
-                  <dl className="panen-history-metrics">
-                    <div>
-                      <dt>Luas Panen</dt>
-                      <dd>
-                        {formatNumber(item.luas_panen)}{' '}
-                        {item.satuan_luas_panen || 'ha'}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt>Hasil Panen</dt>
-                      <dd>
-                        {formatNumber(item.jumlah)} {item.satuan || 'ton'}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt>Produktivitas</dt>
-                      <dd>
-                        {formatNumber(itemProductivity)} {item.satuan || 'ton'}/ha
-                      </dd>
-                    </div>
-                  </dl>
-                </article>
-              );
-            })}
-          </div>
-        )}
       </section>
     </div>
   );
@@ -817,9 +742,9 @@ export default function PanenPage() {
 
 function MetricCard({ icon, label, value }) {
   return (
-    <div className="panen-metric-card">
+    <div className="kendala-metric-card">
       <span>
-        <PanenIcon name={icon} size={20} />
+        <KendalaIcon name={icon} size={17} />
       </span>
       <p>{label}</p>
       <strong>{value}</strong>

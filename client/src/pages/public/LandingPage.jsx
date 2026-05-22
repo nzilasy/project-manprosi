@@ -15,7 +15,7 @@ import './LandingPage.css';
 const indonesiaCenter = [-2.5489, 118.0149];
 const DEFAULT_MAP_ZOOM = 5;
 const MAX_NATIVE_TILE_ZOOM = 18;
-const MAX_MAP_ZOOM = MAX_NATIVE_TILE_ZOOM;
+const MAX_MAP_ZOOM = 20;
 const REGION_MAP_ZOOM = MAX_MAP_ZOOM;
 const ESRI_ATTRIBUTION =
   'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';

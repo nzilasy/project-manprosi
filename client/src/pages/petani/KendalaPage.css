@@ -1,0 +1,501 @@
+.kendala-page-shell {
+  min-height: 100%;
+  padding: 22px 26px 40px;
+  color: #1e293b;
+}
+
+.kendala-page-header {
+  margin-bottom: 24px;
+}
+
+.kendala-page-header h1 {
+  margin: 0;
+  color: #172033;
+  font-size: 32px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.kendala-page-header p {
+  margin: 4px 0 0;
+  color: #7890ab;
+  font-size: 16px;
+}
+
+.kendala-message {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.kendala-message.is-success {
+  border: 1px solid #d7e7de;
+  background: #eef8f1;
+  color: #315f4d;
+}
+
+.kendala-message.is-error {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.kendala-layout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+.kendala-form-card,
+.kendala-summary-card {
+  border: 1px solid #e8edf2;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.kendala-form-card {
+  padding: 24px;
+}
+
+.kendala-form-card h2,
+.kendala-summary-card h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.kendala-form-card form {
+  margin-top: 20px;
+}
+
+.kendala-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 22px;
+}
+
+.kendala-form-card label,
+.kendala-wide-field,
+.kendala-photo-field {
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.kendala-wide-field,
+.kendala-photo-field {
+  margin-top: 20px;
+}
+
+.kendala-form-card label span b {
+  color: #dc2626;
+}
+
+.kendala-form-card input,
+.kendala-form-card select,
+.kendala-form-card textarea {
+  width: 100%;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kendala-form-card input,
+.kendala-form-card select {
+  height: 40px;
+  padding: 0 12px;
+}
+
+.kendala-form-card input:focus,
+.kendala-form-card select:focus,
+.kendala-form-card textarea:focus {
+  border-color: #577568;
+  box-shadow: 0 0 0 2px rgba(87, 117, 104, 0.14);
+}
+
+.kendala-textarea-wrap {
+  position: relative;
+}
+
+.kendala-textarea-wrap textarea {
+  min-height: 112px;
+  resize: vertical;
+  padding: 12px;
+}
+
+.kendala-textarea-wrap small {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.kendala-icon-input {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.kendala-icon-input svg {
+  margin: 0 auto;
+  color: #64748b;
+}
+
+.kendala-icon-input input,
+.kendala-icon-input select {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.kendala-icon-input:focus-within {
+  border-color: #577568;
+  box-shadow: 0 0 0 2px rgba(87, 117, 104, 0.14);
+}
+
+.kendala-location-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+}
+
+.kendala-location-button {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kendala-location-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.kendala-photo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.kendala-photo-preview,
+.kendala-photo-upload {
+  width: 132px;
+  height: 88px;
+  border-radius: 10px;
+}
+
+.kendala-photo-preview {
+  position: relative;
+  overflow: hidden;
+  background: #edf2f7;
+}
+
+.kendala-photo-preview img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.kendala-photo-preview button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.kendala-photo-upload {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  border: 2px dashed #dce5ea;
+  background: #ffffff;
+  color: #7e8ea1;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.kendala-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 32px;
+}
+
+.kendala-form-actions button {
+  min-width: 130px;
+  height: 44px;
+  border-radius: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.kendala-form-actions .secondary {
+  border: 1px solid #d6d3cf;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.kendala-form-actions button[type='submit'] {
+  border: 0;
+  background: #2f6f55;
+  color: #ffffff;
+}
+
+.kendala-form-actions button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.kendala-side-column {
+  display: grid;
+  gap: 18px;
+}
+
+.kendala-summary-card {
+  padding: 18px;
+}
+
+.kendala-summary-card h2 span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.kendala-land-summary {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+
+.kendala-land-image {
+  width: 96px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #f4f7f5;
+  color: #2f6f55;
+}
+
+.kendala-land-image img {
+  width: 76%;
+  height: 76%;
+  object-fit: contain;
+}
+
+.kendala-land-image img.is-kopi {
+  width: 62%;
+  height: 62%;
+}
+
+.kendala-land-image img.is-jagung {
+  width: 58%;
+  height: 58%;
+}
+
+.kendala-land-image img.is-padi {
+  width: 64%;
+  height: 64%;
+}
+
+.kendala-land-image img.is-sayuran {
+  width: 70%;
+  height: 70%;
+}
+
+.kendala-land-summary h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.kendala-land-summary p {
+  margin: 5px 0 8px;
+  color: #8292a8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.kendala-status {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
+.kendala-status.is-active {
+  background: #e9fbef;
+  color: #16803a;
+}
+
+.kendala-detail-list {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0 0;
+}
+
+.kendala-detail-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kendala-detail-list dt {
+  color: #8794a8;
+  font-size: 12px;
+}
+
+.kendala-detail-list dd {
+  margin: 0;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: right;
+}
+
+.kendala-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.kendala-metric-card {
+  min-height: 94px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.kendala-metric-card span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #e7f4ef;
+  color: #2f6f55;
+}
+
+.kendala-metric-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.kendala-metric-card strong {
+  color: #172033;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.kendala-report-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.kendala-report-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.kendala-report-item strong {
+  color: #172033;
+  font-size: 12px;
+}
+
+.kendala-report-item span,
+.kendala-empty-text {
+  color: #8292a8;
+  font-size: 12px;
+}
+
+@media (max-width: 1180px) {
+  .kendala-layout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kendala-side-column {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 980px) {
+  .kendala-form-grid,
+  .kendala-location-row,
+  .kendala-side-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .kendala-page-shell {
+    padding: 18px 14px 30px;
+  }
+
+  .kendala-form-card {
+    padding: 18px;
+  }
+
+  .kendala-form-actions {
+    flex-direction: column;
+  }
+
+  .kendala-form-actions button {
+    width: 100%;
+  }
+}

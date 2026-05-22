@@ -13,6 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const lahanRoutes = require('./routes/lahanRoutes');
 const komoditasRoutes = require('./routes/komoditasRoutes');
 const panenRoutes = require('./routes/panenRoutes');
+const laporanRoutes = require('./routes/laporanRoutes');
 
 const { logger } = require('./middleware/loggerMiddleware');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
@@ -30,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/lahan', lahanRoutes);
 app.use('/api/komoditas', komoditasRoutes);
 app.use('/api/panen', panenRoutes);
+app.use('/api/laporan', laporanRoutes);
 
 // Route tes dasar
 app.get('/', (req, res) => {
