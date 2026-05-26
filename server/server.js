@@ -14,6 +14,9 @@ const lahanRoutes = require('./routes/lahanRoutes');
 const komoditasRoutes = require('./routes/komoditasRoutes');
 const panenRoutes = require('./routes/panenRoutes');
 const laporanRoutes = require('./routes/laporanRoutes');
+const wisataRoutes = require('./routes/wisataRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const kunjunganWisataRoutes = require('./routes/kunjunganWisataRoutes');
 
 const { logger } = require('./middleware/loggerMiddleware');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
@@ -32,6 +35,9 @@ app.use('/api/lahan', lahanRoutes);
 app.use('/api/komoditas', komoditasRoutes);
 app.use('/api/panen', panenRoutes);
 app.use('/api/laporan', laporanRoutes);
+app.use('/api/wisata', wisataRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/kunjungan-wisata', kunjunganWisataRoutes);
 
 // Route tes dasar
 app.get('/', (req, res) => {
@@ -172,18 +178,63 @@ async function repairLegacyPanenForeignKeys() {
   }
 }
 
+async function repairDuplicateUserEmailIndexes() {
+  const [tables] = await sequelize.query(`
+    SELECT TABLE_NAME
+    FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'user'
+  `);
+
+  if (tables.length === 0) return;
+
+  const [indexes] = await sequelize.query(`
+    SELECT INDEX_NAME
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'user'
+      AND COLUMN_NAME = 'email'
+      AND NON_UNIQUE = 0
+    ORDER BY
+      CASE
+        WHEN INDEX_NAME = 'email' THEN 0
+        WHEN INDEX_NAME = 'user_email_unique' THEN 1
+        ELSE 2
+      END,
+      INDEX_NAME
+  `);
+
+  if (indexes.length === 0) {
+    await sequelize.query('ALTER TABLE `user` ADD UNIQUE INDEX `email` (`email`)');
+    return;
+  }
+
+  if (indexes.length === 1) return;
+
+  const [, ...duplicateIndexes] = indexes;
+
+  for (const index of duplicateIndexes) {
+    await sequelize.query(
+      `ALTER TABLE \`user\` DROP INDEX \`${index.INDEX_NAME}\``,
+    );
+  }
+}
+
 async function startServer() {
   try {
     await sequelize.authenticate();
     console.log('Koneksi database berhasil.');
 
     await repairLegacyPanenForeignKeys();
+    await repairDuplicateUserEmailIndexes();
 
     await sequelize.sync({ alter: true });
+    await repairDuplicateUserEmailIndexes();
     console.log('Semua tabel tersinkronisasi.');
 
     await seedRoles();
     await seedKomoditas();
+    // Data wisata dikelola dari fitur CRUD, jadi jangan seed ulang saat server restart.
 
     app.listen(PORT, () => {
       console.log(`Server berjalan di http://localhost:${PORT}`);

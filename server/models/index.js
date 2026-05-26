@@ -121,10 +121,12 @@ Panen.belongsTo(Komoditas, {
 // Wisata -> KunjunganWisata
 Wisata.hasMany(KunjunganWisata, {
   foreignKey: 'id_wisata',
+  as: 'kunjungan',
 });
 
 KunjunganWisata.belongsTo(Wisata, {
   foreignKey: 'id_wisata',
+  as: 'wisata',
 });
 
 module.exports = {

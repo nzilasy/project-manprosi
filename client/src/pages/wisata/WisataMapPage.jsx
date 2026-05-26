@@ -1,0 +1,1638 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  MapContainer,
+  Marker,
+  Popup,
+  TileLayer,
+  Tooltip,
+  useMapEvents,
+  useMap,
+} from 'react-leaflet';
+import L from 'leaflet';
+import { useAuth } from '../../context/AuthContext';
+import { wisataService } from '../../services/wisataService';
+import './WisataMapPage.css';
+
+const DEFAULT_CENTER = [-6.829512, 107.798604];
+const CURRENT_LOCATION_FALLBACK = DEFAULT_CENTER;
+const DEFAULT_MAP_ZOOM = 13;
+const FOCUS_MAP_ZOOM = 14;
+const SELECTED_PLACE_ZOOM = 17;
+const MAX_NATIVE_TILE_ZOOM = 18;
+const MAX_MAP_ZOOM = 20;
+const ESRI_ATTRIBUTION =
+  'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
+const INDONESIA_BOUNDS = [
+  [-11.2, 94.5],
+  [6.5, 141.5],
+];
+
+const FACILITY_OPTIONS = ['Parkir', 'Toilet', 'Musholla', 'Kuliner', 'Penginapan'];
+const ADD_WISATA_INITIAL_FORM = {
+  nama_wisata: '',
+  jenis_wisata: 'Alam',
+  status: 'aktif',
+  alamat: '',
+  desa_kelurahan: '',
+  kecamatan: '',
+  kabupaten_kota: '',
+  provinsi: 'Jawa Barat',
+  latitude: '',
+  longitude: '',
+  harga_tiket: '',
+  rating: '',
+  reviews: '',
+  fasilitas: '',
+  foto: '',
+  deskripsi: '',
+};
+
+const WISATA_STATUS_OPTIONS = [
+  { value: 'baru_dibuka', label: 'Baru Dibuka' },
+  { value: 'aktif', label: 'Aktif' },
+];
+
+const CATEGORY_CONFIG = {
+  alam: {
+    label: 'Alam',
+    color: '#4f7468',
+    bg: '#e8f5ef',
+  },
+  buatan: {
+    label: 'Buatan',
+    color: '#6c7f9b',
+    bg: '#e9eef8',
+  },
+  budaya: {
+    label: 'Budaya',
+    color: '#d6ad5d',
+    bg: '#fff4d7',
+  },
+};
+
+const FALLBACK_WISATA = [
+  {
+    id: 'fallback-1',
+    name: 'Lembah Tengkorak Bandung',
+    category: 'Alam',
+    location: 'Kadakajaya, Tanjungsari',
+    position: [-6.842821, 107.746318],
+    facilities: ['Parkir', 'Toilet', 'Kuliner'],
+    image:
+      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80',
+    rating: 4.8,
+    reviews: 64,
+  },
+  {
+    id: 'fallback-2',
+    name: 'Wisata Alam Cipacet',
+    category: 'Alam',
+    location: 'Sukasari, Sumedang Regency',
+    position: [-6.829512, 107.798604],
+    facilities: ['Parkir', 'Toilet', 'Musholla', 'Kuliner'],
+    image:
+      'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=900&q=80',
+    rating: 4.4,
+    reviews: 243,
+  },
+  {
+    id: 'fallback-3',
+    name: 'Gunung Jambu',
+    category: 'Alam',
+    location: 'Cijambu, Tanjungsari',
+    position: [-6.812508, 107.822214],
+    facilities: ['Parkir', 'Kuliner'],
+    image:
+      'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80',
+    rating: 5,
+    reviews: 15,
+  },
+  {
+    id: 'fallback-4',
+    name: 'Basecamp Gunung Cijambu',
+    category: 'Alam',
+    location: 'Cijambu',
+    position: [-6.801412, 107.781533],
+    facilities: ['Parkir', 'Toilet', 'Penginapan'],
+    image:
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=900&q=80',
+    rating: 4.6,
+    reviews: 31,
+  },
+];
+
+function MapTiles() {
+  return (
+    <>
+      <TileLayer
+        attribution={ESRI_ATTRIBUTION}
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        maxZoom={MAX_MAP_ZOOM}
+        maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
+      />
+
+      <TileLayer
+        attribution="Labels &copy; OpenStreetMap contributors &copy; CARTO"
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
+        subdomains={['a', 'b', 'c', 'd']}
+        maxZoom={MAX_MAP_ZOOM}
+        maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
+      />
+    </>
+  );
+}
+
+function WisataIcon({ name, size = 18 }) {
+  const commonProps = {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    width: size,
+    height: size,
+    'aria-hidden': 'true',
+  };
+
+  const icons = {
+    map: (
+      <svg {...commonProps}>
+        <path d="m3 6 5-2 8 3 5-2v13l-5 2-8-3-5 2V6Z" />
+        <path d="M8 4v13" />
+        <path d="M16 7v13" />
+      </svg>
+    ),
+    reset: (
+      <svg {...commonProps}>
+        <path d="M3 12a9 9 0 1 0 3-6.7" />
+        <path d="M3 4v6h6" />
+      </svg>
+    ),
+    pin: (
+      <svg {...commonProps}>
+        <path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Z" />
+        <circle cx="12" cy="9" r="2.5" />
+      </svg>
+    ),
+    ticket: (
+      <svg {...commonProps}>
+        <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8Z" />
+        <path d="M13 6v12" />
+      </svg>
+    ),
+    mountain: (
+      <svg {...commonProps}>
+        <path d="m3 20 7-13 4 7 2-3 5 9H3Z" />
+        <path d="m10 7 2 4 2-2" />
+      </svg>
+    ),
+    dots: (
+      <svg {...commonProps}>
+        <path d="M5 12h.01" />
+        <path d="M12 12h.01" />
+        <path d="M19 12h.01" />
+      </svg>
+    ),
+    plus: (
+      <svg {...commonProps}>
+        <path d="M12 5v14" />
+        <path d="M5 12h14" />
+      </svg>
+    ),
+    star: (
+      <svg {...commonProps} fill="currentColor" stroke="none">
+        <path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" />
+      </svg>
+    ),
+    trash: (
+      <svg {...commonProps}>
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v5" />
+        <path d="M14 11v5" />
+      </svg>
+    ),
+    edit: (
+      <svg {...commonProps}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+      </svg>
+    ),
+  };
+
+  return icons[name] || null;
+}
+
+function normalizeCategory(value) {
+  const normalized = String(value || 'Alam').toLowerCase();
+
+  if (normalized.includes('budaya')) return 'budaya';
+  if (normalized.includes('buatan')) return 'buatan';
+
+  return 'alam';
+}
+
+function getCategoryConfig(category) {
+  return CATEGORY_CONFIG[normalizeCategory(category)] || CATEGORY_CONFIG.alam;
+}
+
+function normalizeStatus(value) {
+  return String(value || 'aktif').toLowerCase().replace(/\s+/g, '_');
+}
+
+function isNewlyOpenedStatus(value) {
+  return ['baru_dibuka', 'baru', 'new', 'new_open'].includes(normalizeStatus(value));
+}
+
+function getWisataStatusLabel(value) {
+  return isNewlyOpenedStatus(value) ? 'Baru Dibuka' : 'Aktif';
+}
+
+function createWisataMarkerIcon(config) {
+  return L.divIcon({
+    className: 'wisata-marker-wrapper',
+    html: `
+      <div class="wisata-marker-dot" style="--marker-color: ${config.color}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="m7 16 4-7 3 4 1.5-2 2.5 5H7Z"></path>
+          <path d="m11 9 1.4 2.2 1.6-1.2"></path>
+        </svg>
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -22],
+    tooltipAnchor: [0, -22],
+  });
+}
+
+function createCurrentLocationIcon() {
+  return L.divIcon({
+    className: 'wisata-current-location-wrapper',
+    html: `
+      <div class="wisata-current-location-dot">
+        <span></span>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
+    tooltipAnchor: [0, -16],
+  });
+}
+
+function getPosition(item) {
+  if (Array.isArray(item.position) && item.position.length >= 2) {
+    const lat = Number(item.position[0]);
+    const lng = Number(item.position[1]);
+
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) return [lat, lng];
+  }
+
+  const lat = Number(item.latitude);
+  const lng = Number(item.longitude);
+
+  return Number.isNaN(lat) || Number.isNaN(lng) ? null : [lat, lng];
+}
+
+function normalizeWisata(item) {
+  const category = item.category || item.jenis_wisata || 'Alam';
+  const facilities = Array.isArray(item.facilities)
+    ? item.facilities
+    : Array.isArray(item.fasilitas)
+      ? item.fasilitas
+      : [];
+
+  return {
+    id: item.id || item.id_wisata,
+    name: item.name || item.nama_wisata || 'Lokasi Wisata',
+    category,
+    categoryKey: normalizeCategory(category),
+    location: item.location || item.address || 'Lokasi belum diisi',
+    address: item.address || item.lokasi?.alamat || '',
+    position: getPosition(item),
+    facilities,
+    photos: Array.isArray(item.photos)
+      ? item.photos
+      : Array.isArray(item.foto)
+        ? item.foto
+        : [],
+    ticketPrice: item.ticket_price ?? item.harga_tiket ?? '',
+    lokasi: item.lokasi || item.Lokasi || null,
+    image:
+      item.image ||
+      (Array.isArray(item.photos) ? item.photos[0] : null) ||
+      (Array.isArray(item.foto) ? item.foto[0] : null) ||
+      FALLBACK_WISATA[0].image,
+    rating: Number(item.rating ?? 4.4),
+    reviews: Number(item.reviews ?? item.jumlah_ulasan ?? 24),
+    description: item.description || item.deskripsi || '',
+    status: normalizeStatus(item.status),
+    createdAt: item.created_at || item.createdAt || null,
+    isFallback: String(item.id || '').startsWith('fallback-'),
+  };
+}
+
+function calculateDistanceKm(from, to) {
+  if (!from || !to) return null;
+
+  const earthRadiusKm = 6371;
+  const lat1 = (from[0] * Math.PI) / 180;
+  const lat2 = (to[0] * Math.PI) / 180;
+  const deltaLat = ((to[0] - from[0]) * Math.PI) / 180;
+  const deltaLng = ((to[1] - from[1]) * Math.PI) / 180;
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(deltaLng / 2) *
+      Math.sin(deltaLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusKm * c;
+}
+
+function formatDistance(value) {
+  if (value === null || value === undefined) return '-';
+
+  return `${new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value)} km`;
+}
+
+function formatRating(value) {
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(Number(value || 0));
+}
+
+function formatReviewCount(value) {
+  return new Intl.NumberFormat('id-ID').format(Number(value || 0));
+}
+
+function getNewestSortValue(item) {
+  const createdTime = Date.parse(item.createdAt || '');
+
+  if (!Number.isNaN(createdTime)) return createdTime;
+
+  const numericId = Number(item.id);
+  return Number.isNaN(numericId) ? 0 : numericId;
+}
+
+function listFromText(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getWisataFormValues(item) {
+  const lokasi = item.lokasi || {};
+  const position = item.position || [];
+
+  return {
+    nama_wisata: item.name || '',
+    jenis_wisata: item.category || 'Alam',
+    status: item.status || 'aktif',
+    alamat: item.address || lokasi.alamat || '',
+    desa_kelurahan: lokasi.desa_kelurahan || '',
+    kecamatan: lokasi.kecamatan || '',
+    kabupaten_kota: lokasi.kabupaten_kota || '',
+    provinsi: lokasi.provinsi || 'Jawa Barat',
+    latitude: position[0] === undefined ? '' : String(position[0]),
+    longitude: position[1] === undefined ? '' : String(position[1]),
+    harga_tiket: item.ticketPrice === null || item.ticketPrice === undefined
+      ? ''
+      : String(item.ticketPrice),
+    rating: item.rating === null || item.rating === undefined ? '' : String(item.rating),
+    reviews: item.reviews === null || item.reviews === undefined
+      ? ''
+      : formatReviewCount(item.reviews),
+    fasilitas: item.facilities.join(', '),
+    foto: item.photos.join(', '),
+    deskripsi: item.description || '',
+  };
+}
+
+function isValidCoordinate(value, type) {
+  if (Number.isNaN(value)) return false;
+
+  return type === 'lat' ? value >= -90 && value <= 90 : value >= -180 && value <= 180;
+}
+
+function parseCompactDmsCoordinate(value, type) {
+  const text = String(value || '').trim().replace(',', '.');
+  const match = text.match(/^(-)?(\d+)(?:\.(\d+))?$/);
+
+  if (!match) return null;
+
+  const wholePart = match[2];
+  const fractionPart = match[3] ? `.${match[3]}` : '';
+
+  if (wholePart.length < 5) return null;
+
+  const degreeLength = wholePart.length - 4;
+  const degrees = Number(wholePart.slice(0, degreeLength));
+  const minutes = Number(wholePart.slice(degreeLength, degreeLength + 2));
+  const seconds = Number(`${wholePart.slice(degreeLength + 2)}${fractionPart}`);
+
+  if (
+    Number.isNaN(degrees) ||
+    Number.isNaN(minutes) ||
+    Number.isNaN(seconds) ||
+    minutes >= 60 ||
+    seconds >= 60
+  ) {
+    return null;
+  }
+
+  const sign = match[1] ? -1 : type === 'lat' && DEFAULT_CENTER[0] < 0 ? -1 : 1;
+  const coordinate = sign * (degrees + minutes / 60 + seconds / 3600);
+
+  return isValidCoordinate(coordinate, type) ? coordinate : null;
+}
+
+function parseCoordinateInput(value, type) {
+  if (value === '' || value === null || value === undefined) return null;
+
+  const normalizedText = String(value).trim().replace(',', '.');
+  const directValue = Number(normalizedText);
+
+  if (!Number.isNaN(directValue) && isValidCoordinate(directValue, type)) {
+    return directValue;
+  }
+
+  return parseCompactDmsCoordinate(normalizedText, type);
+}
+
+function MapFocus({ items, resetKey, focusTarget }) {
+  const map = useMap();
+  const handledResetKeyRef = useRef(null);
+  const pendingResetKey = focusTarget?.mode === 'reset' ? focusTarget.key : null;
+
+  useEffect(() => {
+    if (pendingResetKey && pendingResetKey !== handledResetKeyRef.current) {
+      return;
+    }
+
+    const positions = items.map((item) => item.position).filter(Boolean);
+
+    if (positions.length === 0) {
+      map.setView(DEFAULT_CENTER, DEFAULT_MAP_ZOOM);
+      return;
+    }
+
+    if (positions.length === 1) {
+      map.flyTo(positions[0], FOCUS_MAP_ZOOM, { duration: 0.75 });
+      return;
+    }
+
+    map.fitBounds(positions, {
+      padding: [58, 58],
+      maxZoom: FOCUS_MAP_ZOOM,
+    });
+  }, [items, map, pendingResetKey, resetKey]);
+
+  useEffect(() => {
+    if (!focusTarget?.position) return;
+
+    if (focusTarget.mode === 'reset') {
+      map.closePopup();
+      map.setView(focusTarget.position, focusTarget.zoom || DEFAULT_MAP_ZOOM, {
+        animate: true,
+      });
+      handledResetKeyRef.current = focusTarget.key;
+      return;
+    }
+
+    map.flyTo(focusTarget.position, focusTarget.zoom || SELECTED_PLACE_ZOOM, {
+      duration: 0.8,
+    });
+  }, [focusTarget?.key, map]);
+
+  return null;
+}
+
+function DraftLocationFocus({ active, position }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!active || !position) return;
+
+    map.flyTo(position, 16, { duration: 0.6 });
+  }, [active, map, position?.[0], position?.[1]]);
+
+  return null;
+}
+
+function AddWisataMapPicker({ active, onPick }) {
+  useMapEvents({
+    click(event) {
+      if (!active) return;
+
+      onPick(event.latlng);
+    },
+  });
+
+  return null;
+}
+
+export default function WisataMapPage({ readOnly = false }) {
+  const { user } = useAuth();
+  const mapCardRef = useRef(null);
+  const listCardRef = useRef(null);
+  const [wisata, setWisata] = useState([]);
+  const [currentLocation, setCurrentLocation] = useState(CURRENT_LOCATION_FALLBACK);
+  const [currentLocationSource, setCurrentLocationSource] = useState('contoh');
+  const [category, setCategory] = useState('semua');
+  const [distance, setDistance] = useState('semua');
+  const [selectedFacilities, setSelectedFacilities] = useState([]);
+  const [sortOrder, setSortOrder] = useState('terbaru');
+  const [resetKey, setResetKey] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingWisata, setEditingWisata] = useState(null);
+  const [addForm, setAddForm] = useState(ADD_WISATA_INITIAL_FORM);
+  const [mapFocusTarget, setMapFocusTarget] = useState(null);
+  const [showAllWisata, setShowAllWisata] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const canManageWisata = !readOnly && ['wisata', 'pengurus'].includes(user?.role);
+
+  const loadWisata = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    if (!silent) {
+      setError('');
+      setMessage('');
+    }
+
+    try {
+      const { data } = await wisataService.getPoints();
+      const nextData = Array.isArray(data.data) ? data.data : [];
+      setWisata(nextData);
+
+      if (nextData.length === 0) {
+        setMessage('Data wisata belum tersedia.');
+      }
+    } catch (err) {
+      console.error('Load wisata points error:', err);
+      setWisata([]);
+      setError('Titik wisata belum dapat dimuat dari server.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const loadInitialWisata = async () => {
+      setLoading(true);
+      setError('');
+      setMessage('');
+
+      try {
+        const { data } = await wisataService.getPoints();
+
+        if (!active) return;
+
+        const nextData = Array.isArray(data.data) ? data.data : [];
+        setWisata(nextData);
+
+        if (nextData.length === 0) {
+          setMessage('Data wisata belum tersedia.');
+        }
+      } catch (err) {
+        if (!active) return;
+
+        console.error('Load wisata points error:', err);
+        setWisata([]);
+        setError('Titik wisata belum dapat dimuat dari server.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadInitialWisata();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleUseBrowserLocation = () => {
+    if (!navigator.geolocation) {
+      setMessage('Browser belum mendukung lokasi otomatis. Jarak memakai lokasi contoh.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLocation = [
+          position.coords.latitude,
+          position.coords.longitude,
+        ];
+
+        setCurrentLocation(nextLocation);
+        setCurrentLocationSource('browser');
+        setMapFocusTarget({
+          position: nextLocation,
+          key: `current-location-${Date.now()}`,
+        });
+        setMessage('Lokasi saat ini berhasil digunakan sebagai patokan jarak.');
+        scrollMapIntoView();
+      },
+      () => {
+        setCurrentLocation(CURRENT_LOCATION_FALLBACK);
+        setCurrentLocationSource('contoh');
+        setMessage('Izin lokasi tidak aktif. Jarak memakai lokasi contoh.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 60000,
+      },
+    );
+  };
+
+  useEffect(() => {
+    handleUseBrowserLocation();
+  }, []);
+
+  const allWisata = useMemo(() => {
+    return wisata.map(normalizeWisata).filter((item) => item.position);
+  }, [wisata]);
+
+  const enrichedWisata = useMemo(() => {
+    return allWisata.map((item) => ({
+      ...item,
+      distanceKm: calculateDistanceKm(currentLocation, item.position),
+    }));
+  }, [allWisata, currentLocation]);
+
+  const filteredWisata = useMemo(() => {
+    const requiredFacilities = selectedFacilities.includes('semua')
+      ? FACILITY_OPTIONS
+      : selectedFacilities;
+
+    return enrichedWisata.filter((item) => {
+      const matchCategory = category === 'semua' || item.categoryKey === category;
+      const matchFacilities =
+        requiredFacilities.length === 0 ||
+        requiredFacilities.every((facility) =>
+          item.facilities.some(
+            (itemFacility) =>
+              itemFacility.toLowerCase() === facility.toLowerCase(),
+          ),
+        );
+      const matchDistance =
+        distance === 'semua' ||
+        (item.distanceKm !== null && item.distanceKm <= Number(distance));
+
+      return matchCategory && matchFacilities && matchDistance;
+    });
+  }, [category, distance, enrichedWisata, selectedFacilities]);
+
+  const nearestWisata = useMemo(() => {
+    return [...filteredWisata]
+      .sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0))
+      .slice(0, 3);
+  }, [filteredWisata]);
+
+  const displayedWisata = useMemo(() => {
+    const nextWisata = [...filteredWisata];
+
+    if (sortOrder === 'terdekat') {
+      return nextWisata.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+    }
+
+    return nextWisata.sort((a, b) => {
+      const statusPriority = Number(isNewlyOpenedStatus(b.status)) -
+        Number(isNewlyOpenedStatus(a.status));
+
+      if (statusPriority !== 0) return statusPriority;
+
+      return getNewestSortValue(b) - getNewestSortValue(a);
+    });
+  }, [filteredWisata, sortOrder]);
+
+  const visibleWisataCards = showAllWisata
+    ? displayedWisata
+    : displayedWisata.slice(0, 3);
+
+  const summary = useMemo(() => {
+    return {
+      total: enrichedWisata.length,
+      budaya: enrichedWisata.filter((item) => item.categoryKey === 'budaya').length,
+      alam: enrichedWisata.filter((item) => item.categoryKey === 'alam').length,
+      buatan: enrichedWisata.filter((item) => item.categoryKey === 'buatan').length,
+    };
+  }, [enrichedWisata]);
+
+  const addFormPosition = useMemo(() => {
+    const latitude = parseCoordinateInput(addForm.latitude, 'lat');
+    const longitude = parseCoordinateInput(addForm.longitude, 'lng');
+
+    if (latitude === null || longitude === null) return null;
+
+    return [latitude, longitude];
+  }, [addForm.latitude, addForm.longitude]);
+  const hasCoordinateInput = addForm.latitude !== '' || addForm.longitude !== '';
+  const hasInvalidCoordinate =
+    showAddForm && addForm.latitude !== '' && addForm.longitude !== '' && !addFormPosition;
+  const selectedAddFacilities = useMemo(
+    () => listFromText(addForm.fasilitas),
+    [addForm.fasilitas],
+  );
+  const selectedAddFacilityNames = useMemo(
+    () => new Set(selectedAddFacilities.map((item) => item.toLowerCase())),
+    [selectedAddFacilities],
+  );
+  const allAddFacilitiesSelected = FACILITY_OPTIONS.every((facility) =>
+    selectedAddFacilityNames.has(facility.toLowerCase()),
+  );
+
+  const allFacilitiesSelected =
+    selectedFacilities.includes('semua') ||
+    FACILITY_OPTIONS.every((facility) => selectedFacilities.includes(facility));
+
+  const handleFacilityToggle = (facility) => {
+    if (facility === 'semua') {
+      setSelectedFacilities((current) =>
+        current.includes('semua') ? [] : ['semua'],
+      );
+      return;
+    }
+
+    setSelectedFacilities((current) => {
+      if (current.includes('semua')) {
+        return [facility];
+      }
+
+      const withoutAll = current.filter((item) => item !== 'semua');
+
+      if (withoutAll.includes(facility)) {
+        return withoutAll.filter((item) => item !== facility);
+      }
+
+      const next = [...withoutAll, facility];
+
+      return next.length === FACILITY_OPTIONS.length ? ['semua'] : next;
+    });
+  };
+
+  const handleResetMap = (event) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    setCategory('semua');
+    setDistance('semua');
+    setSelectedFacilities([]);
+    setSortOrder('terbaru');
+    setShowAllWisata(false);
+    setMapFocusTarget({
+      mode: 'reset',
+      position: DEFAULT_CENTER,
+      zoom: DEFAULT_MAP_ZOOM,
+      key: `reset-map-${Date.now()}`,
+    });
+    setResetKey((current) => current + 1);
+  };
+
+  const handleApplyFilter = () => {
+    setResetKey((current) => current + 1);
+  };
+
+  const scrollMapIntoView = () => {
+    mapCardRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  };
+
+  const handleFocusWisataOnMap = (item) => {
+    if (!item?.position) return;
+
+    setMapFocusTarget({
+      position: item.position,
+      key: `${item.id}-${Date.now()}`,
+    });
+    scrollMapIntoView();
+  };
+
+  const handleViewAllWisata = () => {
+    setCategory('semua');
+    setDistance('semua');
+    setSelectedFacilities([]);
+    setSortOrder('terbaru');
+    setMapFocusTarget(null);
+    setShowAllWisata(true);
+    setResetKey((current) => current + 1);
+    listCardRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
+
+  const handleShowFeaturedWisata = () => {
+    setShowAllWisata(false);
+    listCardRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
+
+  const handleAddFormChange = (field, value) => {
+    setAddForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleAddFacilityToggle = (facility) => {
+    if (facility === 'semua') {
+      handleAddFormChange(
+        'fasilitas',
+        allAddFacilitiesSelected ? '' : FACILITY_OPTIONS.join(', '),
+      );
+      return;
+    }
+
+    const nextFacilities = selectedAddFacilityNames.has(facility.toLowerCase())
+      ? FACILITY_OPTIONS.filter(
+          (item) =>
+            selectedAddFacilityNames.has(item.toLowerCase()) &&
+            item.toLowerCase() !== facility.toLowerCase(),
+        )
+      : [
+          ...FACILITY_OPTIONS.filter((item) =>
+            selectedAddFacilityNames.has(item.toLowerCase()),
+          ),
+          facility,
+        ];
+
+    handleAddFormChange('fasilitas', nextFacilities.join(', '));
+  };
+
+  const handlePickAddLocation = (latlng) => {
+    setAddForm((current) => ({
+      ...current,
+      latitude: latlng.lat.toFixed(6),
+      longitude: latlng.lng.toFixed(6),
+    }));
+    setMessage('Titik lokasi wisata dipilih dari peta.');
+  };
+
+  const handleOpenAddForm = () => {
+    setEditingWisata(null);
+    setAddForm(ADD_WISATA_INITIAL_FORM);
+    setError('');
+    setMessage('');
+    setShowAddForm(true);
+  };
+
+  const handleStartEditWisata = (item) => {
+    if (!canManageWisata || item.isFallback) return;
+
+    setEditingWisata(item);
+    setAddForm(getWisataFormValues(item));
+    setError('');
+    setMessage('');
+    setShowAddForm(true);
+  };
+
+  const handleCloseAddForm = () => {
+    setShowAddForm(false);
+    setEditingWisata(null);
+    setAddForm(ADD_WISATA_INITIAL_FORM);
+  };
+
+  const handleSubmitAddWisata = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setMessage('');
+
+    try {
+      if (!addFormPosition) {
+        throw new Error(
+          'Latitude dan longitude belum valid. Gunakan format decimal, contoh -6.829512 dan 107.798604, atau format 70832.1 dan 1072354.7.',
+        );
+      }
+
+      const payload = {
+        ...addForm,
+        harga_tiket: addForm.harga_tiket === '' ? null : Number(addForm.harga_tiket),
+        rating: addForm.rating,
+        jumlah_ulasan: addForm.reviews,
+        latitude: addFormPosition[0],
+        longitude: addFormPosition[1],
+        fasilitas: listFromText(addForm.fasilitas),
+        foto: listFromText(addForm.foto),
+      };
+
+      if (editingWisata) {
+        await wisataService.update(editingWisata.id, payload);
+      } else {
+        await wisataService.create(payload);
+      }
+
+      setMessage(
+        editingWisata
+          ? 'Lokasi wisata berhasil diperbarui.'
+          : 'Lokasi wisata berhasil ditambahkan.',
+      );
+      handleCloseAddForm();
+      await loadWisata({ silent: true });
+      setCategory('semua');
+      setDistance('semua');
+      setSelectedFacilities([]);
+      setSortOrder('terbaru');
+      setResetKey((current) => current + 1);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          (editingWisata
+            ? 'Gagal memperbarui lokasi wisata.'
+            : 'Gagal menambahkan lokasi wisata.'),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteWisata = async (item) => {
+    if (!canManageWisata || item.isFallback) return;
+
+    const confirmed = window.confirm(
+      `Hapus lokasi wisata "${item.name}" dari peta?`,
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(item.id);
+    setError('');
+    setMessage('');
+
+    try {
+      await wisataService.delete(item.id);
+      await loadWisata({ silent: true });
+      setMessage('Lokasi wisata berhasil dihapus.');
+      setResetKey((current) => current + 1);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal menghapus lokasi wisata.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="wisata-page-shell">
+      <header className="wisata-page-header">
+        <div>
+          <h1>Lokasi Wisata</h1>
+          <p>Lihat dan jelajahi tempat-tempat wisata yang ada di wilayah sekitar anda.</p>
+        </div>
+
+        {canManageWisata && (
+          <button
+            type="button"
+            className="wisata-add-button"
+            onClick={handleOpenAddForm}
+          >
+            <WisataIcon name="plus" size={15} />
+            Tambahkan Lokasi Wisata
+          </button>
+        )}
+      </header>
+
+      {message && <div className="wisata-message is-info">{message}</div>}
+      {error && <div className="wisata-message is-error">{error}</div>}
+
+      {showAddForm && (
+        <section className="wisata-add-panel">
+          <div className="wisata-add-panel-header">
+            <div>
+              <h2>{editingWisata ? 'Edit Lokasi Wisata' : 'Tambah Lokasi Wisata'}</h2>
+              <p>
+                {editingWisata
+                  ? 'Perbarui profil wisata dan titik koordinat yang tampil pada peta.'
+                  : 'Masukkan profil wisata dan titik koordinat untuk ditampilkan pada peta.'}
+              </p>
+            </div>
+            <button type="button" onClick={handleCloseAddForm} aria-label="Tutup form">
+              x
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmitAddWisata} className="wisata-add-form">
+            <label>
+              Nama Wisata <strong>*</strong>
+              <input
+                value={addForm.nama_wisata}
+                onChange={(event) => handleAddFormChange('nama_wisata', event.target.value)}
+                placeholder="Contoh: Wisata Alam Cipacet"
+                required
+              />
+            </label>
+
+            <div className="wisata-add-form-grid three">
+              <label>
+                Kategori
+                <select
+                  value={addForm.jenis_wisata}
+                  onChange={(event) => handleAddFormChange('jenis_wisata', event.target.value)}
+                >
+                  <option value="Alam">Alam</option>
+                  <option value="Buatan">Buatan</option>
+                  <option value="Budaya">Budaya</option>
+                </select>
+              </label>
+
+              <label>
+                Status Wisata
+                <select
+                  value={addForm.status}
+                  onChange={(event) => handleAddFormChange('status', event.target.value)}
+                >
+                  {WISATA_STATUS_OPTIONS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Harga Tiket
+                <input
+                  type="number"
+                  min="0"
+                  value={addForm.harga_tiket}
+                  onChange={(event) => handleAddFormChange('harga_tiket', event.target.value)}
+                  placeholder="Contoh: 10000"
+                />
+              </label>
+            </div>
+
+            <label>
+              Alamat / Patokan
+              <input
+                value={addForm.alamat}
+                onChange={(event) => handleAddFormChange('alamat', event.target.value)}
+                placeholder="Contoh: Cijambu, Tanjungsari"
+              />
+            </label>
+
+            <div className="wisata-add-form-grid three">
+              <label>
+                Desa/Kelurahan
+                <input
+                  value={addForm.desa_kelurahan}
+                  onChange={(event) => handleAddFormChange('desa_kelurahan', event.target.value)}
+                  placeholder="Cijambu"
+                />
+              </label>
+
+              <label>
+                Kecamatan
+                <input
+                  value={addForm.kecamatan}
+                  onChange={(event) => handleAddFormChange('kecamatan', event.target.value)}
+                  placeholder="Tanjungsari"
+                />
+              </label>
+
+              <label>
+                Kab/Kota
+                <input
+                  value={addForm.kabupaten_kota}
+                  onChange={(event) => handleAddFormChange('kabupaten_kota', event.target.value)}
+                  placeholder="Sumedang"
+                />
+              </label>
+            </div>
+
+            <div className="wisata-add-form-grid">
+              <label>
+                Latitude <strong>*</strong>
+                <input
+                  type="number"
+                  step="any"
+                  value={addForm.latitude}
+                  onChange={(event) => handleAddFormChange('latitude', event.target.value)}
+                  placeholder="-6.829512"
+                  required
+                />
+              </label>
+
+              <label>
+                Longitude <strong>*</strong>
+                <input
+                  type="number"
+                  step="any"
+                  value={addForm.longitude}
+                  onChange={(event) => handleAddFormChange('longitude', event.target.value)}
+                  placeholder="107.798604"
+                  required
+                />
+              </label>
+            </div>
+
+            <p className="wisata-add-map-hint">
+              Klik area pada peta di bawah untuk mengisi titik latitude dan longitude secara otomatis.
+              Jika mengetik manual, titik akan dibuat otomatis setelah koordinat valid.
+            </p>
+
+            {addFormPosition && (
+              <p className="wisata-coordinate-preview">
+                Titik otomatis dibuat di {addFormPosition[0].toFixed(6)},{' '}
+                {addFormPosition[1].toFixed(6)}.
+              </p>
+            )}
+
+            {hasInvalidCoordinate && (
+              <p className="wisata-coordinate-preview is-error">
+                Koordinat belum valid. Contoh: -6.829512 dan 107.798604, atau
+                70832.1 dan 1072354.7.
+              </p>
+            )}
+
+            <fieldset className="wisata-add-facilities">
+              <legend>Fasilitas</legend>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={allAddFacilitiesSelected}
+                  onChange={() => handleAddFacilityToggle('semua')}
+                />
+                Semua Fasilitas
+              </label>
+
+              {FACILITY_OPTIONS.map((facility) => (
+                <label key={facility}>
+                  <input
+                    type="checkbox"
+                    checked={selectedAddFacilityNames.has(facility.toLowerCase())}
+                    onChange={() => handleAddFacilityToggle(facility)}
+                  />
+                  {facility}
+                </label>
+              ))}
+            </fieldset>
+
+            <label>
+              Foto URL
+              <input
+                value={addForm.foto}
+                onChange={(event) => handleAddFormChange('foto', event.target.value)}
+                placeholder="https://..."
+              />
+            </label>
+
+            <div className="wisata-add-form-grid">
+              <label>
+                Rating
+                <input
+                  type="text"
+                  value={addForm.rating}
+                  onChange={(event) => handleAddFormChange('rating', event.target.value)}
+                  placeholder="Contoh: 4,5"
+                />
+              </label>
+
+              <label>
+                Jumlah Ulasan
+                <input
+                  type="text"
+                  value={addForm.reviews}
+                  onChange={(event) => handleAddFormChange('reviews', event.target.value)}
+                  placeholder="Contoh: 1.980"
+                />
+              </label>
+            </div>
+
+            <label>
+              Deskripsi
+              <textarea
+                value={addForm.deskripsi}
+                onChange={(event) => handleAddFormChange('deskripsi', event.target.value)}
+                placeholder="Tambahkan deskripsi singkat lokasi wisata..."
+              />
+            </label>
+
+            <div className="wisata-add-actions">
+              <button type="button" onClick={handleCloseAddForm}>
+                Batal
+              </button>
+              <button type="submit" disabled={saving}>
+                {saving
+                  ? 'Menyimpan...'
+                  : editingWisata
+                    ? 'Simpan Perubahan'
+                    : 'Simpan Lokasi Wisata'}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      <section className="wisata-main-layout">
+        <div className="wisata-content-column">
+          <div className="wisata-map-card" ref={mapCardRef}>
+            <MapContainer
+              center={DEFAULT_CENTER}
+              zoom={DEFAULT_MAP_ZOOM}
+              minZoom={5}
+              maxZoom={MAX_MAP_ZOOM}
+              maxBounds={INDONESIA_BOUNDS}
+              maxBoundsViscosity={0.85}
+              scrollWheelZoom
+              className="wisata-map"
+            >
+              <MapTiles />
+              <MapFocus
+                items={filteredWisata}
+                resetKey={resetKey}
+                focusTarget={mapFocusTarget}
+              />
+              <DraftLocationFocus active={showAddForm} position={addFormPosition} />
+              <AddWisataMapPicker
+                active={showAddForm}
+                onPick={handlePickAddLocation}
+              />
+
+              {filteredWisata.map((item) => {
+                const config = getCategoryConfig(item.category);
+                const markerIcon = createWisataMarkerIcon(config);
+
+                return (
+                  <Marker key={item.id} position={item.position} icon={markerIcon}>
+                    <Tooltip
+                      permanent
+                      direction="top"
+                      offset={[0, -12]}
+                      opacity={1}
+                      className="wisata-map-label"
+                    >
+                      {item.name}
+                    </Tooltip>
+
+                    <Popup closeButton>
+                      <div className="wisata-popup">
+                        <img src={item.image} alt="" />
+                        <div>
+                          <h3>{item.name}</h3>
+                          <span>{config.label}</span>
+                          <p>{item.location}</p>
+                          <p className="wisata-distance-line">
+                            Jarak dari lokasi saat ini: {formatDistance(item.distanceKm)}
+                          </p>
+                          <strong>
+                            <WisataIcon name="star" size={14} />
+                            {formatRating(item.rating)} ({formatReviewCount(item.reviews)})
+                          </strong>
+                          {canManageWisata && !item.isFallback && (
+                            <div className="wisata-popup-actions">
+                              <button
+                                type="button"
+                                className="wisata-edit-button compact"
+                                onClick={() => handleStartEditWisata(item)}
+                              >
+                                <WisataIcon name="edit" size={13} />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="wisata-delete-button compact"
+                                disabled={deletingId === item.id}
+                                onClick={() => handleDeleteWisata(item)}
+                              >
+                                <WisataIcon name="trash" size={13} />
+                                {deletingId === item.id ? 'Menghapus...' : 'Hapus'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
+
+              {currentLocation && (
+                <Marker position={currentLocation} icon={createCurrentLocationIcon()}>
+                  <Tooltip
+                    permanent
+                    direction="top"
+                    offset={[0, -10]}
+                    opacity={1}
+                    className="wisata-current-location-label"
+                  >
+                    Lokasi Saat Ini
+                  </Tooltip>
+                  <Popup>
+                    <div className="wisata-current-popup">
+                      <strong>Lokasi Saat Ini</strong>
+                      <span>
+                        {currentLocationSource === 'browser'
+                          ? 'Patokan jarak memakai lokasi perangkat.'
+                          : 'Patokan jarak memakai lokasi contoh.'}
+                      </span>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+
+              {showAddForm && addFormPosition && (
+                <Marker position={addFormPosition}>
+                  <Popup>
+                    {editingWisata ? 'Titik lokasi wisata diperbarui' : 'Lokasi wisata baru'}
+                  </Popup>
+                </Marker>
+              )}
+            </MapContainer>
+
+            <div className="wisata-map-switch">
+              <WisataIcon name="map" size={18} />
+              <select defaultValue="satelit" aria-label="Pilih tipe peta">
+                <option value="satelit">Satelit</option>
+              </select>
+            </div>
+
+            <button type="button" className="wisata-map-reset" onClick={handleResetMap}>
+              Reset Peta
+            </button>
+
+            <div className="wisata-map-legend">
+              {Object.entries(CATEGORY_CONFIG).map(([key, item]) => (
+                <span key={key}>
+                  <i style={{ backgroundColor: item.color }} />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+
+            {loading && <div className="wisata-map-loading">Memuat titik wisata...</div>}
+            {showAddForm && (
+              <div className="wisata-map-pick-note">
+                {hasCoordinateInput && addFormPosition
+                  ? editingWisata
+                    ? 'Titik lokasi wisata sudah diperbarui dari koordinat.'
+                    : 'Titik lokasi wisata baru sudah dibuat dari koordinat.'
+                  : editingWisata
+                    ? 'Klik peta atau isi koordinat untuk memindahkan titik lokasi wisata.'
+                    : 'Klik peta atau isi koordinat untuk memilih titik lokasi wisata baru.'}
+              </div>
+            )}
+          </div>
+
+          <section className="wisata-list-card" ref={listCardRef}>
+            <div className="wisata-list-header">
+              <div>
+                <h2>Daftar Lokasi Wisata</h2>
+                {showAllWisata && (
+                  <p className="wisata-list-note">
+                    Menampilkan semua {displayedWisata.length} lokasi wisata yang tersedia.
+                  </p>
+                )}
+              </div>
+
+              <div className="wisata-list-tools">
+                {showAllWisata && (
+                  <button type="button" onClick={handleShowFeaturedWisata}>
+                    Tampilkan Ringkas
+                  </button>
+                )}
+                <label>
+                  Urutkan
+                  <select
+                    value={sortOrder}
+                    onChange={(event) => setSortOrder(event.target.value)}
+                  >
+                    <option value="terbaru">Terbaru</option>
+                    <option value="terdekat">Terdekat</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className={`wisata-card-grid ${showAllWisata ? 'is-expanded' : ''}`}>
+              {visibleWisataCards.map((item) => {
+                const config = getCategoryConfig(item.category);
+
+                return (
+                  <article className="wisata-location-card" key={item.id}>
+                    <button
+                      type="button"
+                      className="wisata-card-image-button"
+                      onClick={() => handleFocusWisataOnMap(item)}
+                      aria-label={`Fokuskan peta ke ${item.name}`}
+                    >
+                      <img src={item.image} alt="" />
+                    </button>
+                    <div>
+                      <span style={{ backgroundColor: config.bg, color: config.color }}>
+                        {config.label}
+                      </span>
+                      {isNewlyOpenedStatus(item.status) && (
+                        <span className="wisata-card-status-badge">
+                          {getWisataStatusLabel(item.status)}
+                        </span>
+                      )}
+                      <h3>{item.name}</h3>
+                      <p>{item.location}</p>
+                      <p className="wisata-card-distance">
+                        Jarak dari lokasi saat ini: <span>{formatDistance(item.distanceKm)}</span>
+                      </p>
+                      <strong>
+                        <WisataIcon name="star" size={15} />
+                        {formatRating(item.rating)} ({formatReviewCount(item.reviews)})
+                      </strong>
+                      {canManageWisata && !item.isFallback && (
+                        <div className="wisata-card-actions">
+                          <button
+                            type="button"
+                            className="wisata-edit-button"
+                            onClick={() => handleStartEditWisata(item)}
+                          >
+                            <WisataIcon name="edit" size={14} />
+                            Edit Lokasi
+                          </button>
+                          <button
+                            type="button"
+                            className="wisata-delete-button"
+                            disabled={deletingId === item.id}
+                            onClick={() => handleDeleteWisata(item)}
+                          >
+                            <WisataIcon name="trash" size={14} />
+                            {deletingId === item.id ? 'Menghapus...' : 'Hapus Lokasi'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+
+              {!showAllWisata && (
+                <button
+                  type="button"
+                  className="wisata-see-all-card"
+                  onClick={handleViewAllWisata}
+                >
+                  <WisataIcon name="plus" size={28} />
+                  <span>Lihat Semua</span>
+                  <small>{displayedWisata.length} lokasi</small>
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="wisata-summary-section">
+            <h2>Ringkasan Wisata</h2>
+
+            <div className="wisata-summary-grid">
+              <SummaryCard
+                icon="pin"
+                label="Lokasi"
+                value={summary.total}
+                text="Total Lokasi"
+                tone="green"
+              />
+              <SummaryCard
+                icon="ticket"
+                label="Wisata Budaya"
+                value={summary.budaya}
+                text="Total Wisata Budaya"
+                tone="blue"
+              />
+              <SummaryCard
+                icon="mountain"
+                label="Wisata Alam"
+                value={summary.alam}
+                text="Total Wisata Alam"
+                tone="orange"
+              />
+              <SummaryCard
+                icon="dots"
+                label="Wisata Buatan"
+                value={summary.buatan}
+                text="Total Wisata Buatan"
+                tone="purple"
+              />
+            </div>
+          </section>
+        </div>
+
+        <aside className="wisata-side-column">
+          <section className="wisata-filter-card">
+            <h2>Filter Wisata</h2>
+
+            <label>
+              Kategori Wisata
+              <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                <option value="semua">Semua Kategori</option>
+                <option value="alam">Alam</option>
+                <option value="buatan">Buatan</option>
+                <option value="budaya">Budaya</option>
+              </select>
+            </label>
+
+            <div className="wisata-filter-group">
+              <strong>Fasilitas</strong>
+
+              <label>
+                <input
+                  type="checkbox"
+                  checked={allFacilitiesSelected}
+                  onChange={() => handleFacilityToggle('semua')}
+                />
+                Semua Fasilitas
+              </label>
+
+              {FACILITY_OPTIONS.map((facility) => (
+                <label key={facility}>
+                  <input
+                    type="checkbox"
+                    checked={selectedFacilities.includes(facility)}
+                    onChange={() => handleFacilityToggle(facility)}
+                  />
+                  {facility}
+                </label>
+              ))}
+            </div>
+
+            <label>
+              Jarak
+              <select value={distance} onChange={(event) => setDistance(event.target.value)}>
+                <option value="semua">Semua Jarak</option>
+                <option value="10">Maks. 10 km</option>
+                <option value="50">Maks. 50 km</option>
+                <option value="100">Maks. 100 km</option>
+              </select>
+            </label>
+
+            <button type="button" onClick={handleApplyFilter}>
+              Terapkan Filter
+            </button>
+          </section>
+
+          <section className="wisata-nearest-card">
+            <h2>Lokasi Terdekat</h2>
+            <p className="wisata-nearest-note">
+              Dihitung dari{' '}
+              {currentLocationSource === 'browser'
+                ? 'lokasi perangkat saat ini'
+                : 'lokasi contoh saat ini'}
+              .
+            </p>
+
+            <ol>
+              {nearestWisata.map((item) => (
+                <li key={item.id}>
+                  <span>{item.name}</span>
+                  <strong>{formatDistance(item.distanceKm)}</strong>
+                </li>
+              ))}
+            </ol>
+
+            <button type="button" onClick={handleViewAllWisata}>
+              Lihat Semua Lokasi
+            </button>
+            <button
+              type="button"
+              className="wisata-location-button"
+              onClick={handleUseBrowserLocation}
+            >
+              Gunakan Lokasi Saat Ini
+            </button>
+          </section>
+        </aside>
+      </section>
+    </div>
+  );
+}
+
+function SummaryCard({ icon, label, value, text, tone }) {
+  return (
+    <article className={`wisata-summary-card ${tone}`}>
+      <span>
+        <WisataIcon name={icon} size={21} />
+      </span>
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+        <small>{text}</small>
+      </div>
+    </article>
+  );
+}

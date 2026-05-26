@@ -14,17 +14,20 @@ import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
-import { NotFoundPage, UnauthorizedPage } from './pages/ErrorPages';
+import { ComingSoonPage, NotFoundPage, UnauthorizedPage } from './pages/ErrorPages';
 
 import PetaniDashboard from './pages/petani/DashboardPage';
 import LahanPage from './pages/petani/LahanPage';
 import PanenPage from './pages/petani/PanenPage';
 import KendalaPage from './pages/petani/KendalaPage';
 import KomoditasMapPage from './pages/petani/KomoditasMapPage';
+import PetaniWisataMapPage from './pages/petani/WisataMapPage';
+import AiChatPage from './pages/petani/AiChatPage';
 
 import PengurusDashboard from './pages/pengurus/DashboardPage';
 import MasyarakatDashboard from './pages/masyarakat/DashboardPage';
 import WisataDashboard from './pages/wisata/DashboardPage';
+import WisataMapPage from './pages/wisata/WisataMapPage';
 
 const queryClient = new QueryClient();
 
@@ -50,6 +53,8 @@ export default function App() {
                 <Route path="/petani/panen" element={<PanenPage />} />
                 <Route path="/petani/kendala" element={<KendalaPage />} />
                 <Route path="/petani/komoditas" element={<KomoditasMapPage />} />
+                <Route path="/petani/wisata" element={<PetaniWisataMapPage />} />
+                <Route path="/petani/rekomendasi" element={<AiChatPage />} />
               </Route>
             </Route>
 
@@ -71,6 +76,11 @@ export default function App() {
             <Route element={<ProtectedRoute roles={['wisata']} />}>
               <Route element={<DashboardLayout />}>
                 <Route path="/wisata/dashboard" element={<WisataDashboard />} />
+                <Route path="/wisata/data" element={<ComingSoonPage title="Data Wisata" />} />
+                <Route path="/wisata/pengunjung" element={<ComingSoonPage title="Kunjungan" />} />
+                <Route path="/wisata/laporan" element={<ComingSoonPage title="Laporan" />} />
+                <Route path="/wisata/lokasi" element={<WisataMapPage />} />
+                <Route path="/wisata/rekomendasi" element={<ComingSoonPage title="Tanya AI" />} />
               </Route>
             </Route>
 

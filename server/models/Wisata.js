@@ -10,6 +10,8 @@ const Wisata = sequelize.define('Wisata', {
   harga_tiket: { type: DataTypes.DECIMAL(10, 2) },
   fasilitas: { type: DataTypes.TEXT },
   foto: { type: DataTypes.TEXT },
+  rating: { type: DataTypes.DECIMAL(3, 2), allowNull: true },
+  jumlah_ulasan: { type: DataTypes.INTEGER, allowNull: true },
   status: { type: DataTypes.STRING(50) },
 }, { tableName: 'wisata', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
 
