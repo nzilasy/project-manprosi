@@ -25,3 +25,15 @@ export function UnauthorizedPage() {
     </div>
   );
 }
+
+export function ComingSoonPage({ title = 'Coming Soon' }) {
+  return (
+    <div className="min-h-[55vh] flex flex-col items-center justify-center text-center px-4">
+      <div className="text-5xl mb-4">▧</div>
+      <h1 className="text-3xl font-bold text-slate-800 mb-2">{title}</h1>
+      <p className="text-slate-500 max-w-md">
+        Fitur ini sedang disiapkan dan belum tersedia pada versi saat ini.
+      </p>
+    </div>
+  );
+}

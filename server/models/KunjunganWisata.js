@@ -7,6 +7,7 @@ const KunjunganWisata = sequelize.define('KunjunganWisata', {
   tanggal_kunjungan: { type: DataTypes.DATEONLY },
   jumlah_pengunjung: { type: DataTypes.INTEGER },
   asal_pengunjung: { type: DataTypes.STRING(100) },
+  catatan: { type: DataTypes.TEXT, allowNull: true },
 }, { tableName: 'kunjungan_wisata', timestamps: true, createdAt: 'created_at', updatedAt: 'updated_at' });
 
 module.exports = KunjunganWisata;

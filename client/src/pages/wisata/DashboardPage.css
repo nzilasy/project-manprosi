@@ -1,0 +1,401 @@
+.wisata-dashboard {
+  color: #172033;
+}
+
+.wisata-dashboard-header {
+  margin-bottom: 24px;
+}
+
+.wisata-dashboard-header h1 {
+  margin: 0;
+  color: #172033;
+  font-size: 31px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.wisata-dashboard-header p {
+  margin: 6px 0 0;
+  color: #71839a;
+  font-size: 15px;
+}
+
+.wisata-dashboard-message {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.wisata-dashboard-message.success {
+  border: 1px solid #cde8d7;
+  background: #eef8f1;
+  color: #225d41;
+}
+
+.wisata-dashboard-message.error {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.wisata-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 64px;
+  margin-bottom: 30px;
+}
+
+.wisata-stat-card {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.wisata-stat-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.wisata-stat-icon.green {
+  background: #e5f7ec;
+  color: #3f7b55;
+}
+
+.wisata-stat-icon.yellow {
+  background: #fff3ca;
+  color: #d0a638;
+}
+
+.wisata-stat-icon.blue {
+  background: #e8f1ff;
+  color: #4f78b7;
+}
+
+.wisata-stat-icon.purple {
+  background: #efe4ff;
+  color: #6f49b6;
+}
+
+.wisata-stat-card p {
+  margin: 0;
+  color: #172033;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.wisata-stat-card strong {
+  display: block;
+  color: #172033;
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.wisata-stat-card small {
+  color: #6f8f7c;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.wisata-dashboard-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 18px;
+  align-items: start;
+}
+
+.wisata-dashboard-content {
+  min-width: 0;
+  display: grid;
+  gap: 22px;
+}
+
+.wisata-chart-card,
+.wisata-popular-card,
+.wisata-report-card {
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+}
+
+.wisata-chart-card {
+  padding: 28px 30px 22px;
+}
+
+.wisata-popular-card {
+  padding: 27px 30px 30px;
+}
+
+.wisata-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.wisata-card-header h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.wisata-card-header label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #8a98a9;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.wisata-card-header select {
+  height: 34px;
+  min-width: 100px;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #8a98a9;
+  padding: 0 12px;
+  font-size: 11px;
+  outline: none;
+}
+
+.wisata-chart-area {
+  height: 360px;
+}
+
+.wisata-loading-state {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #71839a;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.wisata-popular-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.wisata-popular-item {
+  overflow: hidden;
+  border: 1px solid #e1e8ef;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.wisata-popular-item img {
+  width: 100%;
+  height: 132px;
+  display: block;
+  object-fit: cover;
+}
+
+.wisata-popular-item > div {
+  padding: 11px 14px 15px;
+}
+
+.wisata-popular-item span {
+  display: inline-flex;
+  margin-bottom: 9px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e8f6ee;
+  color: #2d7d55;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.wisata-popular-item h3 {
+  margin: 0 0 6px;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.wisata-popular-item p {
+  min-height: 30px;
+  margin: 0 0 8px;
+  color: #8a98a9;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.wisata-popular-item strong {
+  color: #5d7d70;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.wisata-view-all-card {
+  min-height: 246px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  border: 1px dashed #172033;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #707b8a;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wisata-report-card {
+  padding: 24px 18px 20px;
+}
+
+.wisata-report-card h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.wisata-report-card > p {
+  margin: 5px 0 20px;
+  color: #8a98a9;
+  font-size: 12px;
+}
+
+.wisata-report-card form {
+  display: grid;
+  gap: 15px;
+}
+
+.wisata-report-card label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.wisata-report-card label strong {
+  color: #e12d39;
+}
+
+.wisata-report-card input,
+.wisata-report-card select,
+.wisata-report-card textarea {
+  width: 100%;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.wisata-report-card input,
+.wisata-report-card select {
+  height: 38px;
+  padding: 0 12px;
+}
+
+.wisata-report-card textarea {
+  min-height: 102px;
+  resize: vertical;
+  padding: 12px;
+  line-height: 1.5;
+}
+
+.wisata-report-card input::placeholder,
+.wisata-report-card textarea::placeholder {
+  color: #a2adbb;
+}
+
+.wisata-input-with-unit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+}
+
+.wisata-input-with-unit input {
+  border-radius: 6px 0 0 6px;
+}
+
+.wisata-input-with-unit span {
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dbe3ea;
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  background: #d2cbc3;
+  color: #5d5650;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.wisata-report-card button[type='submit'] {
+  height: 44px;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: #5d7d70;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.wisata-report-card button[type='submit']:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+@media (max-width: 1200px) {
+  .wisata-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .wisata-dashboard-main {
+    grid-template-columns: 1fr;
+  }
+
+  .wisata-popular-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .wisata-dashboard-header h1 {
+    font-size: 27px;
+  }
+
+  .wisata-stat-grid,
+  .wisata-popular-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wisata-chart-card,
+  .wisata-popular-card,
+  .wisata-report-card {
+    padding: 20px 16px;
+  }
+
+  .wisata-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
