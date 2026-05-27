@@ -45,13 +45,6 @@ const COMMODITY_FILTERS = [
     keywords: ['jagung'],
   },
   {
-    key: 'peternakan',
-    label: 'Peternakan',
-    color: '#4f83e8',
-    bg: '#eaf1ff',
-    keywords: ['ternak', 'peternakan', 'sapi', 'kambing', 'ayam'],
-  },
-  {
     key: 'sayuran',
     label: 'Sayuran',
     color: '#a855f7',
@@ -133,14 +126,6 @@ function MapIcon({ name, size = 18 }) {
         <path d="M12 21c4-4 6-8 6-12a6 6 0 0 0-12 0c0 4 2 8 6 12Z" />
         <path d="M9 9h6" />
         <path d="M8 13h8" />
-      </svg>
-    ),
-    peternakan: (
-      <svg {...commonProps}>
-        <path d="M5 11h11l3 3v4h-3v-2H8v2H5v-7Z" />
-        <path d="M6 11 4 8" />
-        <path d="M15 11l2-3" />
-        <circle cx="8" cy="9" r="1" />
       </svg>
     ),
     sayuran: (
