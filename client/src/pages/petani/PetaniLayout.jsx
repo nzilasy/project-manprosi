@@ -48,17 +48,6 @@ function LayoutIcon({ name }) {
         <path d="M5 19c4-5 8-8 14-14" />
       </svg>
     ),
-    cow: (
-      <svg {...commonProps}>
-        <path d="M6 8h11a4 4 0 0 1 4 4v3h-3" />
-        <path d="M6 8 3 5" />
-        <path d="M6 8 3 11" />
-        <path d="M7 15H4v-4" />
-        <path d="M8 15v4" />
-        <path d="M16 15v4" />
-        <path d="M18 8l2-2" />
-      </svg>
-    ),
     alert: (
       <svg {...commonProps}>
         <path d="M12 3 2 21h20L12 3Z" />
@@ -189,13 +178,6 @@ export default function PetaniLayout() {
                   <LayoutIcon name="leaf" />
                 </span>
                 <span>Hasil Panen</span>
-              </NavLink>
-
-              <NavLink to="/petani/peternakan">
-                <span className="petani-nav-icon">
-                  <LayoutIcon name="cow" />
-                </span>
-                <span>Peternakan</span>
               </NavLink>
 
               <NavLink to="/petani/kendala">

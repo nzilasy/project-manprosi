@@ -9,7 +9,6 @@ const navByRole = {
         { to: '/petani/dashboard', label: 'Ringkasan', icon: '⌂' },
         { to: '/petani/lahan', label: 'Kelola Lahan', icon: '▱' },
         { to: '/petani/panen', label: 'Hasil Panen', icon: '🌾' },
-        { to: '/petani/peternakan', label: 'Peternakan', icon: '🐄' },
         { to: '/petani/kendala', label: 'Lapor Kendala', icon: '!' },
       ],
     },

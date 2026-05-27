@@ -346,8 +346,8 @@ export default function LandingPage() {
               <h1>Observasi Potensi Wilayah Pertanian</h1>
 
               <p>
-                Jelajahi potensi pertanian, peternakan, hasil panen, wisata,
-                dan laporan desa dalam satu tampilan terpadu berbasis wilayah
+                Jelajahi potensi pertanian, hasil panen, wisata, dan laporan
+                desa dalam satu tampilan terpadu berbasis wilayah
                 Indonesia.
               </p>
 
