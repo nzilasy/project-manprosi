@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { aiService } from '../../services/aiService';
 import './AiChatPage.css';
 
-const STORAGE_KEY = 'agrosync_ai_messages_v1';
+const STORAGE_KEY_SESSIONS = 'agrosync_ai_sessions_v1';
+const OLD_STORAGE_KEY = 'agrosync_ai_messages_v1';
 const MAX_MESSAGE_LENGTH = 1000;
 
 const DEFAULT_MESSAGES = [
@@ -21,6 +22,15 @@ const DEFAULT_MESSAGES = [
       'Lakukan pemantauan rutin pada tanaman, terutama saat awal musim tanam untuk mencegah serangan lebih parah.',
     createdAt: '10:32',
   },
+];
+
+const DEFAULT_SESSIONS = [
+  {
+    id: 'default-session-1',
+    title: 'Mengatasi hama wereng',
+    updatedAt: Date.now(),
+    messages: DEFAULT_MESSAGES
+  }
 ];
 
 const TOPICS = [
@@ -56,27 +66,50 @@ const TOPICS = [
   },
 ];
 
-function loadMessages() {
+function loadSessions() {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEY_SESSIONS);
     const parsed = stored ? JSON.parse(stored) : null;
 
-    if (Array.isArray(parsed)) {
+    if (Array.isArray(parsed) && parsed.length > 0) {
       return parsed;
+    }
+
+    // Migrate from old format
+    const oldStored = localStorage.getItem(OLD_STORAGE_KEY);
+    const oldParsed = oldStored ? JSON.parse(oldStored) : null;
+    if (Array.isArray(oldParsed) && oldParsed.length > 0) {
+      const firstUserMsg = oldParsed.find(m => m.role === 'user');
+      const title = firstUserMsg ? firstUserMsg.content : 'Percakapan Sebelumnya';
+      return [{
+        id: createId(),
+        title: title.length > 30 ? title.substring(0, 30) + '...' : title,
+        updatedAt: Date.now(),
+        messages: oldParsed
+      }];
     }
   } catch {
     // Ignore corrupted local history.
   }
 
-  return DEFAULT_MESSAGES;
+  return DEFAULT_SESSIONS;
 }
 
-function saveMessages(messages) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+function saveSessions(sessions) {
+  localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
 }
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createInitialChatState() {
+  const sessions = loadSessions();
+
+  return {
+    sessions,
+    activeSessionId: sessions.length > 0 ? sessions[0].id : null,
+  };
 }
 
 function getTimeLabel() {
@@ -187,21 +220,22 @@ function AiIcon({ name, size = 18 }) {
 }
 
 export default function AiChatPage() {
-  const [messages, setMessages] = useState(loadMessages);
+  const [initialChatState] = useState(createInitialChatState);
+  const [sessions, setSessions] = useState(initialChatState.sessions);
+  const [activeSessionId, setActiveSessionId] = useState(initialChatState.activeSessionId);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const historyItems = useMemo(() => {
-    return messages
-      .filter((message) => message.role === 'user')
-      .slice(-5)
-      .reverse();
-  }, [messages]);
+  const currentSession = useMemo(() => {
+    return sessions.find(s => s.id === activeSessionId) || null;
+  }, [sessions, activeSessionId]);
 
-  const updateMessages = (nextMessages) => {
-    setMessages(nextMessages);
-    saveMessages(nextMessages);
+  const messages = currentSession ? currentSession.messages : [];
+
+  const startNewChat = () => {
+    setActiveSessionId(null);
+    setError('');
   };
 
   const sendQuestion = async (question) => {
@@ -209,15 +243,43 @@ export default function AiChatPage() {
 
     if (!cleanQuestion || loading) return;
 
+    let targetSessionId = activeSessionId;
+    let nextSessions = [...sessions];
+    let targetSessionIndex = targetSessionId
+      ? nextSessions.findIndex((session) => session.id === targetSessionId)
+      : -1;
+
+    if (targetSessionIndex < 0) {
+      targetSessionId = createId();
+      const newSession = {
+        id: targetSessionId,
+        title: cleanQuestion.length > 30 ? cleanQuestion.substring(0, 30) + '...' : cleanQuestion,
+        updatedAt: Date.now(),
+        messages: []
+      };
+      nextSessions = [newSession, ...nextSessions];
+      targetSessionIndex = 0;
+      setActiveSessionId(targetSessionId);
+    }
+
     const userMessage = {
       id: createId(),
       role: 'user',
       content: cleanQuestion,
       createdAt: getTimeLabel(),
     };
-    const nextMessages = [...messages, userMessage];
+    
+    const prevMessages = nextSessions[targetSessionIndex].messages;
+    const nextMessages = [...prevMessages, userMessage];
 
-    updateMessages(nextMessages);
+    nextSessions[targetSessionIndex] = {
+      ...nextSessions[targetSessionIndex],
+      messages: nextMessages,
+      updatedAt: Date.now()
+    };
+
+    setSessions(nextSessions);
+    saveSessions(nextSessions);
     setInput('');
     setError('');
     setLoading(true);
@@ -225,21 +287,33 @@ export default function AiChatPage() {
     try {
       const { data } = await aiService.chat({
         message: cleanQuestion,
-        history: messages.map((message) => ({
+        history: prevMessages.map((message) => ({
           role: message.role,
           content: message.content,
         })),
       });
 
-      updateMessages([
-        ...nextMessages,
-        {
-          id: createId(),
-          role: 'assistant',
-          content: data.answer || 'AI belum memberikan jawaban.',
-          createdAt: getTimeLabel(),
-        },
-      ]);
+      setSessions(prev => {
+        const updatedSessions = [...prev];
+        const idx = updatedSessions.findIndex(s => s.id === targetSessionId);
+        if (idx >= 0) {
+           updatedSessions[idx] = {
+             ...updatedSessions[idx],
+             messages: [
+               ...updatedSessions[idx].messages,
+               {
+                 id: createId(),
+                 role: 'assistant',
+                 content: data.answer || 'AI belum memberikan jawaban.',
+                 createdAt: getTimeLabel(),
+               }
+             ],
+             updatedAt: Date.now()
+           };
+           saveSessions(updatedSessions);
+        }
+        return updatedSessions;
+      });
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -256,9 +330,27 @@ export default function AiChatPage() {
     sendQuestion(input);
   };
 
+  const handleDeleteSession = (sessionId) => {
+    if (window.confirm('Yakin ingin menghapus obrolan ini?')) {
+      setSessions(prev => {
+        const nextSessions = prev.filter(s => s.id !== sessionId);
+        saveSessions(nextSessions);
+        return nextSessions;
+      });
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null);
+        setError('');
+      }
+    }
+  };
+
   const handleClearHistory = () => {
-    updateMessages([]);
-    setError('');
+    if (window.confirm('Yakin ingin menghapus semua riwayat percakapan?')) {
+      setSessions([]);
+      setActiveSessionId(null);
+      saveSessions([]);
+      setError('');
+    }
   };
 
   return (
@@ -353,31 +445,43 @@ export default function AiChatPage() {
           <section className="ai-panel ai-history-panel">
             <div className="ai-panel-heading">
               <h2>Riwayat Percakapan</h2>
-              <button type="button">Lihat Semua</button>
+              <button type="button" onClick={startNewChat}>+ Chat Baru</button>
             </div>
 
             <div className="ai-history-list">
-              {historyItems.length === 0 && (
-                <p className="ai-history-empty">Belum ada riwayat pertanyaan.</p>
+              {sessions.length === 0 && (
+                <p className="ai-history-empty">Belum ada riwayat percakapan.</p>
               )}
 
-              {historyItems.map((item) => (
-                <button
-                  type="button"
-                  className="ai-history-item"
-                  key={item.id}
-                  onClick={() => setInput(item.content)}
-                >
-                  <AiIcon name="chat" size={15} />
-                  <span>{item.content}</span>
-                  <small>{item.createdAt}</small>
-                </button>
+              {sessions.map((session) => (
+                <div className={`ai-history-item ${session.id === activeSessionId ? 'active' : ''}`} key={session.id}>
+                  <button
+                    type="button"
+                    className="ai-history-item-main"
+                    onClick={() => setActiveSessionId(session.id)}
+                  >
+                    <AiIcon name="chat" size={15} />
+                    <span>{session.title}</span>
+                    <small>
+                      {new Date(session.updatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                    </small>
+                  </button>
+                  <button 
+                    type="button" 
+                    className="ai-history-item-delete" 
+                    onClick={() => handleDeleteSession(session.id)}
+                    aria-label="Hapus obrolan"
+                    title="Hapus obrolan"
+                  >
+                    <AiIcon name="trash" size={14} />
+                  </button>
+                </div>
               ))}
             </div>
 
             <button type="button" className="ai-clear-history" onClick={handleClearHistory}>
               <AiIcon name="trash" size={16} />
-              Hapus Riwayat
+              Hapus Semua Riwayat
             </button>
           </section>
         </aside>

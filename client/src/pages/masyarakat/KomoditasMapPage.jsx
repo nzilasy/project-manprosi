@@ -1,5 +1,4 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   CircleMarker,
   MapContainer,
@@ -191,26 +190,56 @@ function getKomoditasText(item) {
   return (
     item.komoditas?.nama_komoditas ||
     item.Komoditas?.nama_komoditas ||
+    (Array.isArray(item.commodity) ? item.commodity[0] : null) ||
     'Lainnya'
+  );
+}
+
+function isCoordinateText(value) {
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+function getReadableLocation(...values) {
+  return values.find((value) => {
+    return value && !isCoordinateText(value);
+  });
+}
+
+function getPlaceName(item) {
+  return (
+    getReadableLocation(
+      item.place_name,
+      item.nama_tempat,
+      item.location_name,
+      item.nama_lokasi,
+      item.lokasi?.nama_lokasi,
+      item.Lokasi?.nama_lokasi,
+      item.name,
+      item.nama_lahan,
+    ) ||
+    'Area Komoditas'
   );
 }
 
 function getLocationText(item) {
   return (
-    item.lokasi_lahan ||
-    item.lokasi?.nama_lokasi ||
-    item.lokasi?.nama_desa ||
-    item.lokasi?.alamat ||
-    item.lokasi?.kecamatan ||
-    item.lokasi?.kabupaten ||
-    item.lokasi?.kabupaten_kota ||
-    item.Lokasi?.nama_lokasi ||
-    item.Lokasi?.nama_desa ||
-    item.Lokasi?.alamat ||
-    item.Lokasi?.kecamatan ||
-    item.Lokasi?.kabupaten ||
-    item.Lokasi?.kabupaten_kota ||
-    'Lokasi belum diisi'
+    getReadableLocation(
+      item.location,
+      item.lokasi_lahan,
+      item.lokasi?.nama_lokasi,
+      item.lokasi?.nama_desa,
+      item.lokasi?.alamat,
+      item.lokasi?.kecamatan,
+      item.lokasi?.kabupaten,
+      item.lokasi?.kabupaten_kota,
+      item.Lokasi?.nama_lokasi,
+      item.Lokasi?.nama_desa,
+      item.Lokasi?.alamat,
+      item.Lokasi?.kecamatan,
+      item.Lokasi?.kabupaten,
+      item.Lokasi?.kabupaten_kota,
+    ) ||
+    getPlaceName(item)
   );
 }
 
@@ -221,11 +250,52 @@ function getCoordinate(item, field) {
   return Number.isNaN(number) ? null : number;
 }
 
+function getNumericArea(value) {
+  if (value === undefined || value === null || value === '') return 0;
+
+  const number = Number(value);
+  if (!Number.isNaN(number)) return number;
+
+  const match = String(value).replace(',', '.').match(/[\d.]+/);
+  return match ? Number(match[0]) : 0;
+}
+
+function getAreaUnit(item) {
+  const unitSource = item.satuan_luas || item.area || 'ha';
+  const normalizedUnit = String(unitSource).toLowerCase();
+
+  if (normalizedUnit.includes('m²') || normalizedUnit.includes('m2')) {
+    return 'm2';
+  }
+
+  return 'ha';
+}
+
 function getAreaInHa(item) {
-  const luas = Number(item.luas || 0);
-  const satuan = String(item.satuan_luas || 'ha').toLowerCase();
+  const luas = getNumericArea(item.luas ?? item.area);
+  const satuan = getAreaUnit(item);
 
   return satuan === 'm2' || satuan === 'm²' ? luas / 10000 : luas;
+}
+
+function getAreaLabel(item) {
+  if (item.source_type === 'peternakan') {
+    return item.area || item.production || item.skala || '-';
+  }
+
+  const areaSource = item.luas ?? item.area;
+
+  if (areaSource === undefined || areaSource === null || areaSource === '') {
+    return '-';
+  }
+
+  const areaText = String(areaSource).trim();
+
+  if (/(^|\s)(ha|m2|m²)(\s|$)/i.test(areaText)) {
+    return areaText;
+  }
+
+  return `${areaText} ${item.satuan_luas || getAreaUnit(item)}`;
 }
 
 function formatArea(value) {
@@ -356,6 +426,15 @@ function getPolygonPoints(item) {
 }
 
 function getLahanPosition(item) {
+  if (Array.isArray(item.position) && item.position.length >= 2) {
+    const lat = Number(item.position[0]);
+    const lng = Number(item.position[1]);
+
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      return [lat, lng];
+    }
+  }
+
   const lat = getCoordinate(item, 'latitude');
   const lng = getCoordinate(item, 'longitude');
 
@@ -380,7 +459,11 @@ function getLahanPosition(item) {
 
 function getYearValue(item) {
   const source =
-    item.tanggal_tanam_terakhir || item.created_at || item.updated_at || '';
+    item.planting_date ||
+    item.tanggal_tanam_terakhir ||
+    item.created_at ||
+    item.updated_at ||
+    '';
 
   return String(source).slice(0, 4);
 }
@@ -419,20 +502,26 @@ function enrichLahan(item) {
   const commodityName = getKomoditasText(item);
   const commodity = getCommodityConfig(commodityName);
   const position = getLahanPosition(item);
+  const areaHa = item.area_ha !== undefined ? Number(item.area_ha) : getAreaInHa(item);
   const harvestSeason = getHarvestSeason(item, commodity.key);
+  const locationText = getLocationText(item);
 
   return {
     ...item,
+    id_lahan: item.id_lahan || item.id,
+    nama_lahan: item.nama_lahan || item.name || 'Lahan Komoditas',
+    luas: item.luas || item.area || '-',
+    areaLabel: getAreaLabel(item),
+    harvestSeasonLabel: harvestSeason.label,
+    harvestSeasonNote: harvestSeason.note,
     commodityName,
     commodityKey: commodity.key,
     commodityColor: commodity.color,
     commodityBg: commodity.bg,
-    harvestSeasonLabel: harvestSeason.label,
-    harvestSeasonNote: harvestSeason.note,
     position,
     polygonPoints: getPolygonPoints(item),
-    areaHa: getAreaInHa(item),
-    locationText: getLocationText(item),
+    areaHa: Number.isNaN(areaHa) ? 0 : areaHa,
+    locationText,
     year: getYearValue(item),
     region: getRegionValue(item),
   };
@@ -458,7 +547,7 @@ export default function KomoditasMapPage() {
       setError('');
 
       try {
-        const { data } = await lahanService.getAll();
+        const { data } = await lahanService.getPublic();
 
         if (!active) return;
 
@@ -555,8 +644,8 @@ export default function KomoditasMapPage() {
     <div className="komoditas-map-page">
       <header className="komoditas-map-header">
         <div>
-          <h1>Peta Sebaran Komoditas & Filter</h1>
-          <p>Lihat persebaran komoditas pertanian di wilayah sekitar Anda.</p>
+          <h1>Peta Komoditas & Filter</h1>
+          <p>Lihat peta komoditas pertanian di wilayah sekitar Anda.</p>
         </div>
       </header>
 
@@ -610,9 +699,7 @@ export default function KomoditasMapPage() {
                         <dl>
                           <div>
                             <dt>Luas Lahan</dt>
-                            <dd>
-                              {item.luas || '-'} {item.satuan_luas || 'ha'}
-                            </dd>
+                            <dd>{item.areaLabel}</dd>
                           </div>
                           <div>
                             <dt>Tahun Data</dt>
@@ -630,9 +717,6 @@ export default function KomoditasMapPage() {
                             </dd>
                           </div>
                         </dl>
-                        <Link to={`/petani/lahan?detail=${item.id_lahan}`}>
-                          Lihat Detail
-                        </Link>
                       </div>
                     </Popup>
                   </CircleMarker>

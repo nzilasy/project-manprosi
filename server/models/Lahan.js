@@ -23,6 +23,10 @@ const Lahan = sequelize.define('Lahan', {
     type: DataTypes.STRING(100),
     allowNull: false,
   },
+  nama_tempat: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+  },
   luas: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,

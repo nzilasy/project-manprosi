@@ -16,6 +16,7 @@ import { komoditasService } from '../../services/komoditasService';
 import jagungImage from '../../assets/jagung.jpeg';
 import kopiImage from '../../assets/kopi.jpeg';
 import padiImage from '../../assets/padi.jpeg';
+import peternakanImage from '../../assets/peternakan.jpeg';
 import sayuranImage from '../../assets/sayuran.jpeg';
 
 import './LahanPage.css';
@@ -38,6 +39,7 @@ const VERTEX_CLICK_GUARD_PX = 28;
 
 const defaultForm = {
   nama_lahan: '',
+  nama_tempat: '',
   id_komoditas: '',
   luas: '',
   satuan_luas: 'ha',
@@ -232,21 +234,46 @@ function stopMapEvent(event) {
   }
 }
 
+function isCoordinateText(value) {
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+function getReadableLocation(...values) {
+  return values.find((value) => value && !isCoordinateText(value));
+}
+
+function getPlaceName(item) {
+  return (
+    getReadableLocation(
+      item?.nama_tempat,
+      item?.lokasi?.nama_lokasi,
+      item?.Lokasi?.nama_lokasi,
+      item?.lokasi?.nama_desa,
+      item?.Lokasi?.nama_desa,
+      item?.nama_lahan,
+    ) ||
+    'Nama tempat belum diisi'
+  );
+}
+
 function getLocationText(item) {
   return (
-    item.lokasi_lahan ||
-    item.lokasi?.nama_lokasi ||
-    item.lokasi?.nama_desa ||
-    item.lokasi?.alamat ||
-    item.lokasi?.kecamatan ||
-    item.lokasi?.kabupaten ||
-    item.lokasi?.kabupaten_kota ||
-    item.Lokasi?.nama_lokasi ||
-    item.Lokasi?.nama_desa ||
-    item.Lokasi?.alamat ||
-    item.Lokasi?.kecamatan ||
-    item.Lokasi?.kabupaten ||
-    item.Lokasi?.kabupaten_kota ||
+    getReadableLocation(
+      item.lokasi_lahan,
+      item.lokasi?.nama_lokasi,
+      item.lokasi?.nama_desa,
+      item.lokasi?.alamat,
+      item.lokasi?.kecamatan,
+      item.lokasi?.kabupaten,
+      item.lokasi?.kabupaten_kota,
+      item.Lokasi?.nama_lokasi,
+      item.Lokasi?.nama_desa,
+      item.Lokasi?.alamat,
+      item.Lokasi?.kecamatan,
+      item.Lokasi?.kabupaten,
+      item.Lokasi?.kabupaten_kota,
+    ) ||
+    getPlaceName(item) ||
     'Lokasi belum diisi'
   );
 }
@@ -276,6 +303,17 @@ function getKomoditasImage(item) {
 
   if (komoditas.includes('sayur')) {
     return { src: sayuranImage, className: 'is-sayuran' };
+  }
+
+  if (
+    komoditas.includes('peternakan') ||
+    komoditas.includes('ternak') ||
+    komoditas.includes('sapi') ||
+    komoditas.includes('kambing') ||
+    komoditas.includes('domba') ||
+    komoditas.includes('ayam')
+  ) {
+    return { src: peternakanImage, className: 'is-peternakan' };
   }
 
   return null;
@@ -472,6 +510,7 @@ export default function LahanPage() {
   const syncEditorWithItem = (item) => {
     const savedPolygon = getPolygonPoints(item);
     const locationText = getLocationText(item);
+    const placeName = getPlaceName(item);
 
     setEditingId(item.id_lahan);
     setPolygonPoints(savedPolygon);
@@ -479,6 +518,7 @@ export default function LahanPage() {
 
     setForm({
       nama_lahan: item.nama_lahan || '',
+      nama_tempat: placeName === 'Nama tempat belum diisi' ? '' : placeName,
       id_komoditas: item.id_komoditas || '',
       luas: item.luas || '',
       satuan_luas: item.satuan_luas || 'ha',
@@ -655,8 +695,14 @@ export default function LahanPage() {
   const handleSelectPlace = (place) => {
     const nextPosition = [place.lat, place.lng];
     const shortName = place.name.split(',').slice(0, 4).join(', ');
+    const placeName = place.name.split(',')[0]?.trim() || shortName;
 
     setPlaceSearchQuery(shortName);
+    setForm((previous) => ({
+      ...previous,
+      nama_tempat: previous.nama_tempat || placeName,
+      lokasi_lahan: previous.lokasi_lahan || shortName,
+    }));
     setPlaceSearchResults([]);
     setMapFocusPosition(nextPosition);
     setMessage('Map diarahkan ke patokan. Klik peta untuk memilih titik lahan yang tepat.');
@@ -784,6 +830,18 @@ export default function LahanPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    const namaTempat = form.nama_tempat.trim();
+
+    if (!namaTempat) {
+      setMessage('Nama tempat wajib diisi agar masyarakat dapat mengenali lokasi lahan.');
+      return;
+    }
+
+    if (!form.tanggal_tanam_terakhir) {
+      setMessage('Tanggal tanam terakhir wajib diisi.');
+      return;
+    }
+
     setSaving(true);
     setMessage('');
 
@@ -805,6 +863,7 @@ export default function LahanPage() {
 
       const payload = {
         ...form,
+        nama_tempat: namaTempat,
         id_komoditas: form.id_komoditas || null,
         luas: Number(form.luas),
         lokasi_lahan:
@@ -1014,6 +1073,12 @@ export default function LahanPage() {
 
                   <DetailInfoItem
                     icon={<LahanIcon name="location" size={20} />}
+                    label="Nama Tempat"
+                    value={getPlaceName(selectedDetail)}
+                  />
+
+                  <DetailInfoItem
+                    icon={<LahanIcon name="location" size={20} />}
                     label="Lokasi Lahan"
                     value={getLocationText(selectedDetail)}
                   />
@@ -1142,6 +1207,8 @@ export default function LahanPage() {
                     <Popup>
                       <strong>{item.nama_lahan}</strong>
                       <br />
+                      {getPlaceName(item)}
+                      <br />
                       {getKomoditasText(item)}
                       <br />
                       {item.luas} {item.satuan_luas || 'ha'}
@@ -1205,6 +1272,8 @@ export default function LahanPage() {
                   >
                     <Popup>
                       <strong>{item.nama_lahan}</strong>
+                      <br />
+                      {getPlaceName(item)}
                       <br />
                       {getKomoditasText(item)}
                       <br />
@@ -1271,6 +1340,8 @@ export default function LahanPage() {
               ) : (
                 visibleLahan.map((item) => {
                   const komoditasImage = getKomoditasImage(item);
+                  const placeName = getPlaceName(item);
+                  const locationText = getLocationText(item);
 
                   return (
                     <article
@@ -1319,8 +1390,10 @@ export default function LahanPage() {
                         </div>
 
                         <p>
+                          {placeName} •{' '}
                           {item.luas} {item.satuan_luas || 'ha'} •{' '}
-                          {getLocationText(item)} • {getKomoditasText(item)}
+                          {locationText !== placeName ? `${locationText} • ` : ''}
+                          {getKomoditasText(item)}
                         </p>
                       </div>
 
@@ -1466,6 +1539,17 @@ export default function LahanPage() {
               )}
             </div>
 
+            <label>
+              Nama Tempat
+              <input
+                name="nama_tempat"
+                value={form.nama_tempat}
+                onChange={handleChange}
+                placeholder="Contoh: Blok Cijambu atau Kebun Pak Budi"
+                required
+              />
+            </label>
+
             <div className="lahan-coordinate-grid">
               <label>
                 Latitude
@@ -1497,6 +1581,7 @@ export default function LahanPage() {
                 name="tanggal_tanam_terakhir"
                 value={form.tanggal_tanam_terakhir}
                 onChange={handleChange}
+                required
               />
             </label>
 

@@ -5,6 +5,7 @@ import { panenService } from '../../services/panenService';
 import jagungImage from '../../assets/jagung.jpeg';
 import kopiImage from '../../assets/kopi.jpeg';
 import padiImage from '../../assets/padi.jpeg';
+import peternakanImage from '../../assets/peternakan.jpeg';
 import sayuranImage from '../../assets/sayuran.jpeg';
 import './PanenPage.css';
 
@@ -13,7 +14,16 @@ const commodityImages = [
   { keyword: 'kopi', src: kopiImage, className: 'is-kopi' },
   { keyword: 'padi', src: padiImage, className: 'is-padi' },
   { keyword: 'sayur', src: sayuranImage, className: 'is-sayuran' },
+  { keyword: 'peternakan', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'ternak', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'sapi', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'kambing', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'domba', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'ayam', src: peternakanImage, className: 'is-peternakan' },
 ];
+
+const FARM_HARVEST_UNITS = ['ton', 'kg', 'kwintal'];
+const LIVESTOCK_HARVEST_UNITS = ['ekor', 'kg', 'liter', 'butir'];
 
 function createDefaultForm() {
   const today = new Date();
@@ -90,6 +100,30 @@ function getCommodityImage(name) {
   const normalizedName = String(name || '').toLowerCase();
 
   return commodityImages.find((item) => normalizedName.includes(item.keyword));
+}
+
+function isLivestockCommodity(name) {
+  const normalizedName = String(name || '').toLowerCase();
+
+  return [
+    'peternakan',
+    'ternak',
+    'sapi',
+    'kambing',
+    'domba',
+    'ayam',
+  ].some((keyword) => normalizedName.includes(keyword));
+}
+
+function getHarvestUnitOptions(commodityName) {
+  return isLivestockCommodity(commodityName)
+    ? LIVESTOCK_HARVEST_UNITS
+    : FARM_HARVEST_UNITS;
+}
+
+function normalizeHarvestUnit(commodityName, currentUnit) {
+  const options = getHarvestUnitOptions(commodityName);
+  return options.includes(currentUnit) ? currentUnit : options[0];
 }
 
 function calculateProductivity(jumlah, luas) {
@@ -209,6 +243,11 @@ export default function PanenPage() {
 
         if (nextLahan.length > 0) {
           const firstLahan = nextLahan[0];
+          const firstKomoditas = nextKomoditas.find(
+            (item) => String(item.id_komoditas) === String(firstLahan.id_komoditas),
+          );
+          const firstCommodityName =
+            firstKomoditas?.nama_komoditas || getCommodityName(firstLahan);
 
           setForm((current) => ({
             ...current,
@@ -219,6 +258,7 @@ export default function PanenPage() {
             luas_panen: current.luas_panen || String(firstLahan.luas || ''),
             satuan_luas_panen:
               current.satuan_luas_panen || firstLahan.satuan_luas || 'ha',
+            satuan: normalizeHarvestUnit(firstCommodityName, current.satuan),
           }));
         }
       } catch (err) {
@@ -263,6 +303,12 @@ export default function PanenPage() {
   const selectedCommodityName =
     selectedKomoditas?.nama_komoditas || getCommodityName(selectedLahan);
   const selectedCommodityImage = getCommodityImage(selectedCommodityName);
+  const isLivestockSelected = isLivestockCommodity(selectedCommodityName);
+  const harvestLabel = isLivestockSelected ? 'Hasil Produksi' : 'Hasil Panen';
+  const productivityLabel = isLivestockSelected
+    ? 'Produktivitas Produksi'
+    : 'Produktivitas';
+  const harvestUnitOptions = getHarvestUnitOptions(selectedCommodityName);
 
   const productivity = useMemo(() => {
     return calculateProductivity(form.jumlah, form.luas_panen);
@@ -290,23 +336,38 @@ export default function PanenPage() {
     setForm((current) => ({
       ...current,
       [field]: value,
+      ...(field === 'id_komoditas'
+        ? {
+            satuan: normalizeHarvestUnit(
+              komoditas.find(
+                (item) => String(item.id_komoditas) === String(value),
+              )?.nama_komoditas || getCommodityName(selectedLahan),
+              current.satuan,
+            ),
+          }
+        : {}),
     }));
   };
 
   const handleLahanChange = (value) => {
     const nextLahan = lahan.find((item) => String(item.id_lahan) === value);
+    const nextKomoditasId = nextLahan?.id_komoditas
+      ? String(nextLahan.id_komoditas)
+      : '';
+    const nextCommodityName =
+      komoditas.find((item) => String(item.id_komoditas) === nextKomoditasId)
+        ?.nama_komoditas || getCommodityName(nextLahan);
 
     setForm((current) => ({
       ...current,
       id_lahan: value,
-      id_komoditas: nextLahan?.id_komoditas
-        ? String(nextLahan.id_komoditas)
-        : current.id_komoditas,
+      id_komoditas: nextKomoditasId || current.id_komoditas,
       luas_panen:
         nextLahan?.luas !== undefined && nextLahan?.luas !== null
           ? String(nextLahan.luas)
           : current.luas_panen,
       satuan_luas_panen: nextLahan?.satuan_luas || current.satuan_luas_panen,
+      satuan: normalizeHarvestUnit(nextCommodityName, current.satuan),
     }));
   };
 
@@ -344,17 +405,22 @@ export default function PanenPage() {
   const resetForm = () => {
     const nextForm = createDefaultForm();
     const firstLahan = selectedLahan || lahan[0];
+    const firstKomoditasId = firstLahan?.id_komoditas
+      ? String(firstLahan.id_komoditas)
+      : '';
+    const firstCommodityName =
+      komoditas.find((item) => String(item.id_komoditas) === firstKomoditasId)
+        ?.nama_komoditas || getCommodityName(firstLahan);
 
     clearPhotos();
 
     setForm({
       ...nextForm,
       id_lahan: firstLahan ? String(firstLahan.id_lahan) : '',
-      id_komoditas: firstLahan?.id_komoditas
-        ? String(firstLahan.id_komoditas)
-        : '',
+      id_komoditas: firstKomoditasId,
       luas_panen: firstLahan?.luas ? String(firstLahan.luas) : '',
       satuan_luas_panen: firstLahan?.satuan_luas || 'ha',
+      satuan: normalizeHarvestUnit(firstCommodityName, nextForm.satuan),
     });
   };
 
@@ -507,7 +573,7 @@ export default function PanenPage() {
               </label>
 
               <label>
-                <span>Hasil Panen <b>*</b></span>
+                <span>{harvestLabel} <b>*</b></span>
                 <div className="panen-addon-input">
                   <input
                     type="number"
@@ -521,15 +587,17 @@ export default function PanenPage() {
                     value={form.satuan}
                     onChange={(event) => handleChange('satuan', event.target.value)}
                   >
-                    <option value="ton">ton</option>
-                    <option value="kg">kg</option>
-                    <option value="kwintal">kwintal</option>
+                    {harvestUnitOptions.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {unit}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </label>
 
               <label>
-                <span>Produktivitas</span>
+                <span>{productivityLabel}</span>
                 <input
                   type="text"
                   value={`${formatNumber(productivity)} ${form.satuan}/ha`}
@@ -578,7 +646,7 @@ export default function PanenPage() {
                       handleChange('harga_jual', event.target.value)
                     }
                   />
-                  <span>Rp/kg</span>
+                  <span>Rp/{form.satuan || 'unit'}</span>
                 </div>
               </label>
             </div>
@@ -717,12 +785,12 @@ export default function PanenPage() {
               />
               <MetricCard
                 icon="harvest"
-                label="Hasil Panen"
+                label={harvestLabel}
                 value={`${form.jumlah || '0'} ${form.satuan}`}
               />
               <MetricCard
                 icon="chart"
-                label="Produktivitas"
+                label={productivityLabel}
                 value={`${formatNumber(productivity)} ${form.satuan}/ha`}
               />
               <MetricCard
@@ -765,6 +833,12 @@ export default function PanenPage() {
                 item.komoditas?.nama_komoditas ||
                 item.Komoditas?.nama_komoditas ||
                 getCommodityName(historyLahan);
+              const historyHarvestLabel = isLivestockCommodity(historyKomoditas)
+                ? 'Hasil Produksi'
+                : 'Hasil Panen';
+              const historyProductivityLabel = isLivestockCommodity(historyKomoditas)
+                ? 'Produktivitas Produksi'
+                : 'Produktivitas';
               const itemProductivity =
                 item.produktivitas ||
                 calculateProductivity(item.jumlah, item.luas_panen);
@@ -792,14 +866,14 @@ export default function PanenPage() {
                     </div>
 
                     <div>
-                      <dt>Hasil Panen</dt>
+                      <dt>{historyHarvestLabel}</dt>
                       <dd>
                         {formatNumber(item.jumlah)} {item.satuan || 'ton'}
                       </dd>
                     </div>
 
                     <div>
-                      <dt>Produktivitas</dt>
+                      <dt>{historyProductivityLabel}</dt>
                       <dd>
                         {formatNumber(itemProductivity)} {item.satuan || 'ton'}/ha
                       </dd>

@@ -90,23 +90,33 @@ const DEFAULT_ROLES = [
 const DEFAULT_KOMODITAS = [
   {
     nama_komoditas: 'Padi',
+    kategori: 'Pertanian',
     satuan: 'ton',
     deskripsi: 'Komoditas padi sawah',
   },
   {
     nama_komoditas: 'Jagung',
+    kategori: 'Pertanian',
     satuan: 'ton',
     deskripsi: 'Komoditas jagung',
   },
   {
     nama_komoditas: 'Kopi',
+    kategori: 'Pertanian',
     satuan: 'kg',
     deskripsi: 'Komoditas kopi',
   },
   {
     nama_komoditas: 'Sayuran',
+    kategori: 'Pertanian',
     satuan: 'kg',
     deskripsi: 'Komoditas sayuran',
+  },
+  {
+    nama_komoditas: 'Peternakan',
+    kategori: 'Peternakan',
+    satuan: 'ekor',
+    deskripsi: 'Komoditas hasil peternakan',
   },
 ];
 
@@ -126,19 +136,29 @@ async function seedRoles() {
 }
 
 async function seedKomoditas() {
-  const [kategoriPertanian] = await Kategori.findOrCreate({
-    where: {
-      nama_kategori: 'Pertanian',
-    },
-  });
+  const kategoriByName = new Map();
 
   for (const item of DEFAULT_KOMODITAS) {
+    const kategoriName = item.kategori || 'Pertanian';
+
+    if (!kategoriByName.has(kategoriName)) {
+      const [kategori] = await Kategori.findOrCreate({
+        where: {
+          nama_kategori: kategoriName,
+        },
+      });
+
+      kategoriByName.set(kategoriName, kategori);
+    }
+
+    const kategori = kategoriByName.get(kategoriName);
+
     const [komoditas, created] = await Komoditas.findOrCreate({
       where: {
         nama_komoditas: item.nama_komoditas,
       },
       defaults: {
-        id_kategori: kategoriPertanian.id_kategori,
+        id_kategori: kategori.id_kategori,
         satuan: item.satuan,
         deskripsi: item.deskripsi,
       },
@@ -146,7 +166,7 @@ async function seedKomoditas() {
 
     if (!created) {
       await komoditas.update({
-        id_kategori: komoditas.id_kategori || kategoriPertanian.id_kategori,
+        id_kategori: komoditas.id_kategori || kategori.id_kategori,
         satuan: komoditas.satuan || item.satuan,
         deskripsi: komoditas.deskripsi || item.deskripsi,
       });

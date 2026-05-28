@@ -6,6 +6,7 @@ import { laporanService } from '../../services/laporanService';
 import jagungImage from '../../assets/jagung.jpeg';
 import kopiImage from '../../assets/kopi.jpeg';
 import padiImage from '../../assets/padi.jpeg';
+import peternakanImage from '../../assets/peternakan.jpeg';
 import sayuranImage from '../../assets/sayuran.jpeg';
 import './KendalaPage.css';
 
@@ -14,6 +15,12 @@ const commodityImages = [
   { keyword: 'kopi', src: kopiImage, className: 'is-kopi' },
   { keyword: 'padi', src: padiImage, className: 'is-padi' },
   { keyword: 'sayur', src: sayuranImage, className: 'is-sayuran' },
+  { keyword: 'peternakan', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'ternak', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'sapi', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'kambing', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'domba', src: peternakanImage, className: 'is-peternakan' },
+  { keyword: 'ayam', src: peternakanImage, className: 'is-peternakan' },
 ];
 
 const categories = [
