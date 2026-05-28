@@ -353,6 +353,11 @@
   height: 70%;
 }
 
+.panen-land-image img.is-peternakan {
+  width: 88%;
+  height: 88%;
+}
+
 .panen-land-summary h3 {
   margin: 0;
   color: #172033;

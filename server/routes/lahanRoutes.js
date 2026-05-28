@@ -5,6 +5,7 @@ const {
   Lokasi,
   Komoditas,
   Panen,
+  Peternakan,
 } = require('../models/index');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -22,6 +23,21 @@ const includeLahan = [
     model: Komoditas,
     as: 'komoditas',
     required: false,
+  },
+];
+
+const includePeternakan = [
+  {
+    model: Lokasi,
+    required: true,
+    where: {
+      latitude: {
+        [Op.ne]: null,
+      },
+      longitude: {
+        [Op.ne]: null,
+      },
+    },
   },
 ];
 
@@ -110,15 +126,44 @@ function normalizePolygon(value) {
 }
 
 function getLocationText(item) {
+  const lokasi = item.lokasi || item.Lokasi || {};
+
   return (
-    item.lokasi_lahan ||
-    item.lokasi?.nama_lokasi ||
-    item.lokasi?.nama_desa ||
-    item.lokasi?.alamat ||
-    item.lokasi?.kecamatan ||
-    item.lokasi?.kabupaten ||
-    item.lokasi?.kabupaten_kota ||
-    'Lokasi belum diisi'
+    getReadableLocation(
+      item.lokasi_lahan,
+      lokasi.nama_lokasi,
+      lokasi.nama_desa,
+      lokasi.desa_kelurahan,
+      lokasi.alamat,
+      lokasi.kecamatan,
+      lokasi.kabupaten,
+      lokasi.kabupaten_kota,
+    ) ||
+    getPlaceName(item)
+  );
+}
+
+function isCoordinateText(value) {
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+function getReadableLocation(...values) {
+  return values.find((value) => value && !isCoordinateText(value));
+}
+
+function getPlaceName(item) {
+  const lokasi = item.lokasi || item.Lokasi || {};
+
+  return (
+    getReadableLocation(
+      item.nama_tempat,
+      item.nama_peternakan,
+      lokasi.nama_lokasi,
+      lokasi.nama_desa,
+      lokasi.desa_kelurahan,
+      item.nama_lahan,
+    ) ||
+    'Area Komoditas'
   );
 }
 
@@ -158,21 +203,28 @@ function getAreaInHa(item) {
 // GET /api/lahan/public
 router.get('/public', async (req, res) => {
   try {
-    const lahan = await Lahan.findAll({
-      where: {
-        latitude: {
-          [Op.ne]: null,
+    const [lahan, peternakan] = await Promise.all([
+      Lahan.findAll({
+        where: {
+          latitude: {
+            [Op.ne]: null,
+          },
+          longitude: {
+            [Op.ne]: null,
+          },
         },
-        longitude: {
-          [Op.ne]: null,
-        },
-      },
-      include: includeLahan,
-      order: [['created_at', 'DESC']],
-      limit: 100,
-    });
+        include: includeLahan,
+        order: [['created_at', 'DESC']],
+        limit: 100,
+      }),
+      Peternakan.findAll({
+        include: includePeternakan,
+        order: [['created_at', 'DESC']],
+        limit: 100,
+      }),
+    ]);
 
-    const data = lahan
+    const lahanData = lahan
       .map((item) => {
         const latitude = Number(item.latitude);
         const longitude = Number(item.longitude);
@@ -183,10 +235,13 @@ router.get('/public', async (req, res) => {
 
         const komoditas = item.komoditas?.nama_komoditas || 'Belum dipilih';
         const potential = getPotentialStatus(item);
+        const placeName = getPlaceName(item);
 
         return {
           id: item.id_lahan,
           name: item.nama_lahan,
+          nama_tempat: placeName,
+          place_name: placeName,
           location: getLocationText(item),
           position: [latitude, longitude],
           status: potential.label,
@@ -202,8 +257,47 @@ router.get('/public', async (req, res) => {
       })
       .filter(Boolean);
 
+    const peternakanData = peternakan
+      .map((item) => {
+        const lokasi = item.Lokasi || item.lokasi || {};
+        const latitude = Number(lokasi.latitude);
+        const longitude = Number(lokasi.longitude);
+
+        if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+          return null;
+        }
+
+        const placeName = getPlaceName(item);
+        const jenisTernak = item.jenis_ternak || 'Peternakan';
+
+        return {
+          id: `peternakan-${item.id_peternakan}`,
+          id_peternakan: item.id_peternakan,
+          source_type: 'peternakan',
+          name: item.nama_peternakan || placeName,
+          nama_tempat: placeName,
+          place_name: placeName,
+          location: getLocationText(item),
+          position: [latitude, longitude],
+          status: item.status || 'Aktif',
+          potential: 'peternakan',
+          color: '#0f766e',
+          commodity: [`Peternakan - ${jenisTernak}`],
+          production: item.skala || '-',
+          area: item.skala || '-',
+          area_ha: 0,
+          productivity: '-',
+          planting_date: null,
+          livestock_type: jenisTernak,
+          description: item.deskripsi || null,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+        };
+      })
+      .filter(Boolean);
+
     return res.json({
-      data,
+      data: [...lahanData, ...peternakanData],
     });
   } catch (error) {
     console.error('Get public lahan error:', error);
@@ -349,6 +443,7 @@ router.post('/', async (req, res) => {
 
     const {
       nama_lahan,
+      nama_tempat,
       id_komoditas,
       id_lokasi,
       luas,
@@ -366,6 +461,20 @@ router.post('/', async (req, res) => {
     if (!nama_lahan || nama_lahan.trim() === '') {
       return res.status(400).json({
         message: 'Nama lahan wajib diisi.',
+      });
+    }
+
+    const normalizedNamaTempat = String(nama_tempat || '').trim();
+
+    if (!normalizedNamaTempat) {
+      return res.status(400).json({
+        message: 'Nama tempat wajib diisi.',
+      });
+    }
+
+    if (!tanggal_tanam_terakhir) {
+      return res.status(400).json({
+        message: 'Tanggal tanam terakhir wajib diisi.',
       });
     }
 
@@ -390,6 +499,7 @@ router.post('/', async (req, res) => {
       id_lokasi: id_lokasi || null,
       id_komoditas: id_komoditas || null,
       nama_lahan: nama_lahan.trim(),
+      nama_tempat: normalizedNamaTempat,
       luas: Number(luas),
       satuan_luas: satuan_luas || 'ha',
       lokasi_lahan: lokasi_lahan || null,
@@ -445,10 +555,27 @@ router.put('/:id', async (req, res) => {
       }
     }
 
+    const nextNamaTempat = req.body.nama_tempat ?? lahan.nama_tempat;
+    const nextTanggalTanam =
+      req.body.tanggal_tanam_terakhir ?? lahan.tanggal_tanam_terakhir;
+
+    if (!nextNamaTempat || String(nextNamaTempat).trim() === '') {
+      return res.status(400).json({
+        message: 'Nama tempat wajib diisi.',
+      });
+    }
+
+    if (!nextTanggalTanam) {
+      return res.status(400).json({
+        message: 'Tanggal tanam terakhir wajib diisi.',
+      });
+    }
+
     await lahan.update({
       id_lokasi: req.body.id_lokasi ?? lahan.id_lokasi,
       id_komoditas: req.body.id_komoditas ?? lahan.id_komoditas,
       nama_lahan: req.body.nama_lahan ?? lahan.nama_lahan,
+      nama_tempat: String(nextNamaTempat).trim(),
       luas:
         req.body.luas === undefined ||
         req.body.luas === null ||
@@ -457,8 +584,7 @@ router.put('/:id', async (req, res) => {
           : Number(req.body.luas),
       satuan_luas: req.body.satuan_luas ?? lahan.satuan_luas,
       lokasi_lahan: req.body.lokasi_lahan ?? lahan.lokasi_lahan,
-      tanggal_tanam_terakhir:
-        req.body.tanggal_tanam_terakhir ?? lahan.tanggal_tanam_terakhir,
+      tanggal_tanam_terakhir: nextTanggalTanam,
       latitude:
         req.body.latitude === undefined
           ? lahan.latitude

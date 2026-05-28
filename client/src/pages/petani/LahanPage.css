@@ -330,6 +330,11 @@
   height: 76%;
 }
 
+.lahan-thumb-image.is-peternakan {
+  width: 88%;
+  height: 88%;
+}
+
 .lahan-item-title-row {
   display: flex;
   align-items: center;

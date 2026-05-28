@@ -364,6 +364,31 @@ function formatDistance(value) {
   }).format(value)} km`;
 }
 
+function isPositionInsideBounds(position) {
+  if (!position) return false;
+
+  const [[south, west], [north, east]] = INDONESIA_BOUNDS;
+  const [lat, lng] = position;
+
+  return lat >= south && lat <= north && lng >= west && lng <= east;
+}
+
+function getGeolocationErrorMessage(error) {
+  if (error?.code === error?.PERMISSION_DENIED) {
+    return 'Izin lokasi ditolak. Aktifkan izin lokasi browser untuk memakai posisi perangkat.';
+  }
+
+  if (error?.code === error?.POSITION_UNAVAILABLE) {
+    return 'Lokasi perangkat belum tersedia. Jarak memakai lokasi contoh.';
+  }
+
+  if (error?.code === error?.TIMEOUT) {
+    return 'Pencarian lokasi terlalu lama. Jarak memakai lokasi contoh.';
+  }
+
+  return 'Lokasi perangkat belum dapat digunakan. Jarak memakai lokasi contoh.';
+}
+
 function formatRating(value) {
   return new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 1,
@@ -473,7 +498,11 @@ function parseCoordinateInput(value, type) {
 function MapFocus({ items, resetKey, focusTarget }) {
   const map = useMap();
   const handledResetKeyRef = useRef(null);
-  const pendingResetKey = focusTarget?.mode === 'reset' ? focusTarget.key : null;
+  const focusKey = focusTarget?.key || null;
+  const focusMode = focusTarget?.mode || null;
+  const focusPosition = focusTarget?.position || null;
+  const focusZoom = focusTarget?.zoom || null;
+  const pendingResetKey = focusMode === 'reset' ? focusKey : null;
 
   useEffect(() => {
     if (pendingResetKey && pendingResetKey !== handledResetKeyRef.current) {
@@ -499,21 +528,21 @@ function MapFocus({ items, resetKey, focusTarget }) {
   }, [items, map, pendingResetKey, resetKey]);
 
   useEffect(() => {
-    if (!focusTarget?.position) return;
+    if (!focusPosition) return;
 
-    if (focusTarget.mode === 'reset') {
+    if (focusMode === 'reset') {
       map.closePopup();
-      map.setView(focusTarget.position, focusTarget.zoom || DEFAULT_MAP_ZOOM, {
+      map.setView(focusPosition, focusZoom || DEFAULT_MAP_ZOOM, {
         animate: true,
       });
-      handledResetKeyRef.current = focusTarget.key;
+      handledResetKeyRef.current = focusKey;
       return;
     }
 
-    map.flyTo(focusTarget.position, focusTarget.zoom || SELECTED_PLACE_ZOOM, {
+    map.flyTo(focusPosition, focusZoom || SELECTED_PLACE_ZOOM, {
       duration: 0.8,
     });
-  }, [focusTarget?.key, map]);
+  }, [focusKey, focusMode, focusPosition, focusZoom, map]);
 
   return null;
 }
@@ -525,7 +554,7 @@ function DraftLocationFocus({ active, position }) {
     if (!active || !position) return;
 
     map.flyTo(position, 16, { duration: 0.6 });
-  }, [active, map, position?.[0], position?.[1]]);
+  }, [active, map, position]);
 
   return null;
 }
@@ -546,6 +575,7 @@ export default function WisataMapPage({ readOnly = false }) {
   const { user } = useAuth();
   const mapCardRef = useRef(null);
   const listCardRef = useRef(null);
+  const focusKeyRef = useRef(0);
   const [wisata, setWisata] = useState([]);
   const [currentLocation, setCurrentLocation] = useState(CURRENT_LOCATION_FALLBACK);
   const [currentLocationSource, setCurrentLocationSource] = useState('contoh');
@@ -556,15 +586,21 @@ export default function WisataMapPage({ readOnly = false }) {
   const [resetKey, setResetKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingWisata, setEditingWisata] = useState(null);
   const [addForm, setAddForm] = useState(ADD_WISATA_INITIAL_FORM);
   const [mapFocusTarget, setMapFocusTarget] = useState(null);
   const [showAllWisata, setShowAllWisata] = useState(false);
+  const [locationStatus, setLocationStatus] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const canManageWisata = !readOnly && ['wisata', 'pengurus'].includes(user?.role);
+  const createMapFocusKey = (prefix) => {
+    focusKeyRef.current += 1;
+    return `${prefix}-${focusKeyRef.current}`;
+  };
 
   const loadWisata = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -625,45 +661,6 @@ export default function WisataMapPage({ readOnly = false }) {
     return () => {
       active = false;
     };
-  }, []);
-
-  const handleUseBrowserLocation = () => {
-    if (!navigator.geolocation) {
-      setMessage('Browser belum mendukung lokasi otomatis. Jarak memakai lokasi contoh.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const nextLocation = [
-          position.coords.latitude,
-          position.coords.longitude,
-        ];
-
-        setCurrentLocation(nextLocation);
-        setCurrentLocationSource('browser');
-        setMapFocusTarget({
-          position: nextLocation,
-          key: `current-location-${Date.now()}`,
-        });
-        setMessage('Lokasi saat ini berhasil digunakan sebagai patokan jarak.');
-        scrollMapIntoView();
-      },
-      () => {
-        setCurrentLocation(CURRENT_LOCATION_FALLBACK);
-        setCurrentLocationSource('contoh');
-        setMessage('Izin lokasi tidak aktif. Jarak memakai lokasi contoh.');
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 60000,
-      },
-    );
-  };
-
-  useEffect(() => {
-    handleUseBrowserLocation();
   }, []);
 
   const allWisata = useMemo(() => {
@@ -801,7 +798,7 @@ export default function WisataMapPage({ readOnly = false }) {
       mode: 'reset',
       position: DEFAULT_CENTER,
       zoom: DEFAULT_MAP_ZOOM,
-      key: `reset-map-${Date.now()}`,
+      key: createMapFocusKey('reset-map'),
     });
     setResetKey((current) => current + 1);
   };
@@ -817,12 +814,81 @@ export default function WisataMapPage({ readOnly = false }) {
     });
   };
 
+  const applyFallbackLocation = (statusText) => {
+    setCurrentLocation(CURRENT_LOCATION_FALLBACK);
+    setCurrentLocationSource('contoh');
+    setMapFocusTarget({
+      position: CURRENT_LOCATION_FALLBACK,
+      zoom: FOCUS_MAP_ZOOM,
+      key: createMapFocusKey('fallback-location'),
+    });
+    setLocationStatus(statusText);
+    setMessage(statusText);
+    setIsLocating(false);
+    scrollMapIntoView();
+  };
+
+  const handleUseBrowserLocation = () => {
+    setIsLocating(true);
+    setError('');
+    setLocationStatus('Mendeteksi lokasi perangkat...');
+    setMessage('Mendeteksi lokasi perangkat...');
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      const statusText =
+        typeof window !== 'undefined' && !window.isSecureContext
+          ? 'Lokasi otomatis hanya tersedia di HTTPS atau localhost. Jarak memakai lokasi contoh.'
+          : 'Browser belum mendukung lokasi otomatis. Jarak memakai lokasi contoh.';
+      applyFallbackLocation(statusText);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLocation = [
+          Number(position.coords.latitude),
+          Number(position.coords.longitude),
+        ];
+
+        if (!Number.isFinite(nextLocation[0]) || !Number.isFinite(nextLocation[1])) {
+          applyFallbackLocation('Koordinat lokasi perangkat tidak valid. Jarak memakai lokasi contoh.');
+          return;
+        }
+
+        if (!isPositionInsideBounds(nextLocation)) {
+          applyFallbackLocation('Lokasi perangkat berada di luar area peta Indonesia. Jarak memakai lokasi contoh.');
+          return;
+        }
+
+        setCurrentLocation(nextLocation);
+        setCurrentLocationSource('browser');
+        setMapFocusTarget({
+          position: nextLocation,
+          zoom: FOCUS_MAP_ZOOM,
+          key: createMapFocusKey('current-location'),
+        });
+        setLocationStatus('Lokasi perangkat berhasil digunakan.');
+        setMessage('Lokasi saat ini berhasil digunakan sebagai patokan jarak.');
+        setIsLocating(false);
+        scrollMapIntoView();
+      },
+      (locationError) => {
+        applyFallbackLocation(getGeolocationErrorMessage(locationError));
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 60000,
+      },
+    );
+  };
+
   const handleFocusWisataOnMap = (item) => {
     if (!item?.position) return;
 
     setMapFocusTarget({
       position: item.position,
-      key: `${item.id}-${Date.now()}`,
+      key: createMapFocusKey(`wisata-${item.id}`),
     });
     scrollMapIntoView();
   };
@@ -1612,9 +1678,15 @@ export default function WisataMapPage({ readOnly = false }) {
               type="button"
               className="wisata-location-button"
               onClick={handleUseBrowserLocation}
+              disabled={isLocating}
             >
-              Gunakan Lokasi Saat Ini
+              {isLocating ? 'Mendeteksi Lokasi...' : 'Gunakan Lokasi Saat Ini'}
             </button>
+            {locationStatus && (
+              <p className="wisata-location-status" aria-live="polite">
+                {locationStatus}
+              </p>
+            )}
           </section>
         </aside>
       </section>
