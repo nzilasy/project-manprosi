@@ -39,6 +39,12 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const [showSidebar, setShowSidebar] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const roleLabels = {
+    petani: 'Petani',
+    pengurus: 'Pengurus Desa',
+    masyarakat: 'Masyarakat',
+    wisata: 'Pengelola Wisata',
+  };
 
   const userName =
     user?.name ||
@@ -46,7 +52,8 @@ export default function DashboardLayout() {
     user?.username ||
     'Budi Santoso';
 
-  const userRole = user?.role || 'petani';
+  const userRoleKey = user?.role || 'petani';
+  const userRole = roleLabels[userRoleKey] || userRoleKey;
 
   const handleLogout = () => {
     setShowUserMenu(false);

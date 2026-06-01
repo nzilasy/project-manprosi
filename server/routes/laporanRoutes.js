@@ -80,6 +80,29 @@ function serializeLaporan(row, lahanMap = new Map()) {
   };
 }
 
+function normalizeReportStatus(value) {
+  const status = String(value || '').toLowerCase();
+
+  if (
+    status === 'belum_diproses' ||
+    status.includes('belum') ||
+    status.includes('baru') ||
+    status.includes('menunggu')
+  ) {
+    return 'belum_diproses';
+  }
+
+  if (status === 'diproses' || status.includes('proses')) {
+    return 'diproses';
+  }
+
+  if (status === 'selesai' || status.includes('selesai') || status.includes('verifikasi')) {
+    return 'selesai';
+  }
+
+  return null;
+}
+
 router.use(protect);
 router.use(authorize('petani', 'pengurus'));
 
@@ -158,6 +181,48 @@ router.get('/summary/:id_lahan', async (req, res) => {
   }
 });
 
+router.patch('/:id/status', authorize('pengurus'), async (req, res) => {
+  try {
+    const status = normalizeReportStatus(req.body.status);
+
+    if (!status) {
+      return res.status(400).json({
+        message: 'Status laporan tidak valid.',
+      });
+    }
+
+    const laporan = await Laporan.findByPk(req.params.id);
+
+    if (!laporan) {
+      return res.status(404).json({
+        message: 'Laporan tidak ditemukan.',
+      });
+    }
+
+    await laporan.update({ status });
+
+    const lahan =
+      laporan.reportable_type === 'lahan'
+        ? await Lahan.findByPk(laporan.reportable_id)
+        : null;
+    const lahanMap = lahan
+      ? new Map([[Number(laporan.reportable_id), lahan]])
+      : new Map();
+
+    return res.json({
+      message: 'Status laporan berhasil diperbarui.',
+      data: serializeLaporan(laporan, lahanMap),
+    });
+  } catch (error) {
+    console.error('Update status laporan error:', error);
+
+    return res.status(500).json({
+      message: 'Gagal memperbarui status laporan.',
+      error: error.message,
+    });
+  }
+});
+
 router.post('/', async (req, res) => {
   try {
     const {
@@ -208,7 +273,7 @@ router.post('/', async (req, res) => {
       kategori,
       tingkat_keparahan: tingkat_keparahan || 'sedang',
       lokasi_kendala: lokasi_kendala || lahan.lokasi_lahan || null,
-      status: 'baru',
+      status: 'belum_diproses',
       judul: judul || String(deskripsi).slice(0, 140),
       deskripsi: deskripsi || judul,
       tanggal: tanggal || new Date().toISOString().slice(0, 10),

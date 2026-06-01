@@ -1,0 +1,482 @@
+.wisata-kendala-page {
+  display: grid;
+  gap: 24px;
+  color: #172033;
+}
+
+.wisata-kendala-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.wisata-kendala-header span {
+  display: block;
+  margin-bottom: 8px;
+  color: #55796a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.wisata-kendala-header h1 {
+  margin: 0;
+  color: #172033;
+  font-size: 34px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.wisata-kendala-header p {
+  margin: 6px 0 0;
+  color: #71839a;
+  font-size: 15px;
+}
+
+.wisata-kendala-message {
+  border-radius: 12px;
+  padding: 13px 16px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.wisata-kendala-message.success {
+  border: 1px solid #cdebd9;
+  background: #effbf4;
+  color: #17603f;
+}
+
+.wisata-kendala-message.error {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.wisata-kendala-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wisata-kendala-stat-card,
+.wisata-kendala-form-card,
+.wisata-kendala-wisata-card,
+.wisata-kendala-history-card {
+  border: 1px solid #e6edf3;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+}
+
+.wisata-kendala-stat-card {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+
+.wisata-kendala-stat-card > span {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #edf5f2;
+  color: #55796a;
+}
+
+.wisata-kendala-stat-card.warning > span {
+  background: #fff4e5;
+  color: #d97706;
+}
+
+.wisata-kendala-stat-card.process > span {
+  background: #eaf2ff;
+  color: #2563eb;
+}
+
+.wisata-kendala-stat-card.success > span {
+  background: #e9fbef;
+  color: #16803a;
+}
+
+.wisata-kendala-stat-card strong {
+  display: block;
+  color: #172033;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.wisata-kendala-stat-card p {
+  margin: 5px 0 0;
+  color: #71839a;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.wisata-kendala-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 22px;
+  align-items: start;
+}
+
+.wisata-kendala-form-card {
+  padding: 26px;
+}
+
+.wisata-kendala-card-title h2,
+.wisata-kendala-wisata-card h2,
+.wisata-kendala-history-card h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.wisata-kendala-card-title p {
+  margin: 5px 0 0;
+  color: #71839a;
+  font-size: 13px;
+}
+
+.wisata-kendala-form-card form {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.wisata-kendala-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.wisata-kendala-form-card label,
+.wisata-kendala-photo-field {
+  display: grid;
+  gap: 8px;
+  color: #344256;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.wisata-kendala-form-card label strong {
+  color: #dc2626;
+}
+
+.wisata-kendala-form-card input,
+.wisata-kendala-form-card select,
+.wisata-kendala-form-card textarea {
+  width: 100%;
+  border: 1px solid #d9e2ea;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.wisata-kendala-form-card input,
+.wisata-kendala-form-card select {
+  height: 44px;
+  padding: 0 13px;
+}
+
+.wisata-kendala-form-card textarea {
+  min-height: 138px;
+  resize: vertical;
+  padding: 13px;
+  line-height: 1.55;
+}
+
+.wisata-kendala-form-card input:focus,
+.wisata-kendala-form-card select:focus,
+.wisata-kendala-form-card textarea:focus {
+  border-color: #55796a;
+  box-shadow: 0 0 0 3px rgba(85, 121, 106, 0.14);
+}
+
+.wisata-kendala-form-card label > small {
+  justify-self: end;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.wisata-kendala-icon-input {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  border: 1px solid #d9e2ea;
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.wisata-kendala-icon-input svg {
+  margin: 0 auto;
+  color: #71839a;
+}
+
+.wisata-kendala-icon-input input {
+  border: 0;
+  border-radius: 0;
+}
+
+.wisata-kendala-icon-input:focus-within {
+  border-color: #55796a;
+  box-shadow: 0 0 0 3px rgba(85, 121, 106, 0.14);
+}
+
+.wisata-kendala-photo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wisata-kendala-photo-preview,
+.wisata-kendala-upload {
+  width: 136px;
+  height: 92px;
+  border-radius: 10px;
+}
+
+.wisata-kendala-photo-preview {
+  position: relative;
+  overflow: hidden;
+  background: #edf2f7;
+}
+
+.wisata-kendala-photo-preview img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.wisata-kendala-photo-preview button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.wisata-kendala-upload {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 7px;
+  border: 2px dashed #d6e1ea;
+  background: #ffffff;
+  color: #71839a;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.wisata-kendala-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #edf2f7;
+}
+
+.wisata-kendala-actions button {
+  min-width: 128px;
+  min-height: 44px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.wisata-kendala-actions button:first-child {
+  border: 1px solid #d9e2ea;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.wisata-kendala-actions button:last-child {
+  border: 0;
+  background: #55796a;
+  color: #ffffff;
+}
+
+.wisata-kendala-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.wisata-kendala-side {
+  display: grid;
+  gap: 18px;
+}
+
+.wisata-kendala-wisata-card,
+.wisata-kendala-history-card {
+  padding: 20px;
+}
+
+.wisata-kendala-wisata-card img {
+  width: 100%;
+  height: 150px;
+  display: block;
+  margin: 16px 0 14px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.wisata-kendala-wisata-card strong {
+  display: block;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.wisata-kendala-wisata-card span {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #e8f6ee;
+  color: #2d7d55;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.wisata-kendala-wisata-card p {
+  margin: 10px 0 0;
+  color: #71839a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wisata-kendala-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wisata-kendala-history-head span {
+  color: #8aa0bb;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.wisata-kendala-history-list {
+  display: grid;
+  gap: 11px;
+  margin-top: 16px;
+}
+
+.wisata-kendala-report-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 13px;
+  border: 1px solid #edf2f7;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.wisata-kendala-report-item strong {
+  display: block;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1.35;
+}
+
+.wisata-kendala-report-item span,
+.wisata-kendala-report-item small,
+.wisata-kendala-empty {
+  color: #71839a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.wisata-kendala-report-item span {
+  display: block;
+  margin-top: 4px;
+}
+
+.wisata-kendala-report-item small {
+  display: block;
+  margin-top: 4px;
+}
+
+.wisata-kendala-report-item em {
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.wisata-kendala-report-item .status-belum_diproses {
+  background: #fff3e8;
+  color: #ea580c;
+}
+
+.wisata-kendala-report-item .status-diproses {
+  background: #eaf2ff;
+  color: #2563eb;
+}
+
+.wisata-kendala-report-item .status-selesai {
+  background: #e9fbef;
+  color: #16803a;
+}
+
+@media (max-width: 1180px) {
+  .wisata-kendala-stat-grid,
+  .wisata-kendala-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .wisata-kendala-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .wisata-kendala-header h1 {
+    font-size: 28px;
+  }
+
+  .wisata-kendala-form-grid,
+  .wisata-kendala-side {
+    grid-template-columns: 1fr;
+  }
+
+  .wisata-kendala-form-card,
+  .wisata-kendala-wisata-card,
+  .wisata-kendala-history-card {
+    padding: 18px;
+  }
+
+  .wisata-kendala-actions {
+    flex-direction: column;
+  }
+
+  .wisata-kendala-actions button {
+    width: 100%;
+  }
+}

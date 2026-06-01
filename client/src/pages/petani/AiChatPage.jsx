@@ -2,11 +2,9 @@ import { useMemo, useState } from 'react';
 import { aiService } from '../../services/aiService';
 import './AiChatPage.css';
 
-const STORAGE_KEY_SESSIONS = 'agrosync_ai_sessions_v1';
-const OLD_STORAGE_KEY = 'agrosync_ai_messages_v1';
 const MAX_MESSAGE_LENGTH = 1000;
 
-const DEFAULT_MESSAGES = [
+const PETANI_DEFAULT_MESSAGES = [
   {
     id: 'seed-user',
     role: 'user',
@@ -24,16 +22,25 @@ const DEFAULT_MESSAGES = [
   },
 ];
 
-const DEFAULT_SESSIONS = [
+const PENGURUS_DEFAULT_MESSAGES = [
   {
-    id: 'default-session-1',
-    title: 'Mengatasi hama wereng',
-    updatedAt: Date.now(),
-    messages: DEFAULT_MESSAGES
-  }
+    id: 'seed-pengurus-user',
+    role: 'user',
+    content: 'Bagaimana menentukan prioritas tindak lanjut laporan potensi desa?',
+    createdAt: '10:32',
+  },
+  {
+    id: 'seed-pengurus-assistant',
+    role: 'assistant',
+    content:
+      'Prioritas tindak lanjut bisa dibuat dari kombinasi dampak, urgensi, dan kesiapan sumber daya.\n\n1. Urutkan berdasarkan tingkat masalah\nDahulukan laporan yang menghambat produksi, akses lahan, atau keselamatan warga.\n\n2. Kelompokkan berdasarkan jenis potensi\nPisahkan pertanian, peternakan, pariwisata, dan lahan kosong agar keputusan lebih mudah dibandingkan.\n\n3. Gunakan data lokasi dan status\nLaporan yang lokasinya jelas dan statusnya belum diproses sebaiknya masuk daftar kerja awal.\n\n4. Buat rencana tindak lanjut\nTetapkan penanggung jawab, target waktu, dan catatan hasil verifikasi lapangan.',
+    tip:
+      'Gunakan data laporan terbaru sebagai dasar rapat desa, lalu tandai status laporan agar progresnya mudah dipantau.',
+    createdAt: '10:32',
+  },
 ];
 
-const TOPICS = [
+const PETANI_TOPICS = [
   {
     title: 'Budidaya Tanaman',
     text: 'Cara menanam & merawat tanaman',
@@ -66,9 +73,87 @@ const TOPICS = [
   },
 ];
 
-function loadSessions() {
+const PENGURUS_TOPICS = [
+  {
+    title: 'Prioritas Laporan',
+    text: 'Urutkan laporan yang perlu ditindaklanjuti',
+    tone: 'green',
+    question: 'Bagaimana cara menentukan prioritas laporan potensi desa yang harus ditindaklanjuti lebih dulu?',
+  },
+  {
+    title: 'Potensi Desa',
+    text: 'Analisis pertanian, peternakan, dan wisata',
+    tone: 'cream',
+    question: 'Bagaimana membaca data potensi desa untuk membuat rekomendasi pengembangan wilayah?',
+  },
+  {
+    title: 'Lahan Kosong',
+    text: 'Ide pemanfaatan lahan belum produktif',
+    tone: 'blue',
+    question: 'Apa rekomendasi pemanfaatan lahan kosong agar lebih produktif untuk desa?',
+  },
+  {
+    title: 'Peta Komoditas',
+    text: 'Sebaran komoditas dan wilayah potensial',
+    tone: 'orange',
+    question: 'Bagaimana cara memakai peta komoditas untuk mengambil keputusan pengembangan desa?',
+  },
+  {
+    title: 'Laporan Wisata',
+    text: 'Kendala dan peluang destinasi wisata',
+    tone: 'sky',
+    question: 'Bagaimana menindaklanjuti laporan kendala wisata agar potensi wisata desa meningkat?',
+  },
+];
+
+const AI_CONFIGS = {
+  petani: {
+    context: 'petani',
+    storageKeySessions: 'agrosync_ai_sessions_v1',
+    oldStorageKey: 'agrosync_ai_messages_v1',
+    defaultSessions: [
+      {
+        id: 'default-session-1',
+        title: 'Mengatasi hama wereng',
+        updatedAt: Date.now(),
+        messages: PETANI_DEFAULT_MESSAGES,
+      },
+    ],
+    topics: PETANI_TOPICS,
+    heading: 'Tanya Ai',
+    subtitle: 'Dapatkan rekomendasi dan jawaban seputar pertanian dari Ai.',
+    emptyTitle: 'Mulai percakapan pertanian',
+    emptyText: 'Pilih topik populer atau tulis pertanyaan tentang lahan, panen, hama, dan peningkatan potensi.',
+    placeholder: 'Tanyakan apa saja tentang pertanian...',
+    typingText: 'Ai sedang menyusun rekomendasi...',
+    tipLabel: 'Tips AgroAi',
+  },
+  pengurus: {
+    context: 'pengurus',
+    storageKeySessions: 'agrosync_pengurus_ai_sessions_v1',
+    oldStorageKey: null,
+    defaultSessions: [
+      {
+        id: 'default-pengurus-session-1',
+        title: 'Prioritas laporan desa',
+        updatedAt: Date.now(),
+        messages: PENGURUS_DEFAULT_MESSAGES,
+      },
+    ],
+    topics: PENGURUS_TOPICS,
+    heading: 'Tanya Ai',
+    subtitle: 'Dapatkan rekomendasi untuk memantau potensi, laporan, dan tindak lanjut wilayah desa.',
+    emptyTitle: 'Mulai analisis potensi desa',
+    emptyText: 'Pilih topik populer atau tulis pertanyaan tentang laporan potensi, lahan kosong, wisata, dan prioritas tindak lanjut.',
+    placeholder: 'Tanyakan tentang potensi desa, laporan, atau tindak lanjut...',
+    typingText: 'Ai sedang menyusun rekomendasi pengurus desa...',
+    tipLabel: 'Catatan AgroAi',
+  },
+};
+
+function loadSessions(config) {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY_SESSIONS);
+    const stored = localStorage.getItem(config.storageKeySessions);
     const parsed = stored ? JSON.parse(stored) : null;
 
     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -76,7 +161,7 @@ function loadSessions() {
     }
 
     // Migrate from old format
-    const oldStored = localStorage.getItem(OLD_STORAGE_KEY);
+    const oldStored = config.oldStorageKey ? localStorage.getItem(config.oldStorageKey) : null;
     const oldParsed = oldStored ? JSON.parse(oldStored) : null;
     if (Array.isArray(oldParsed) && oldParsed.length > 0) {
       const firstUserMsg = oldParsed.find(m => m.role === 'user');
@@ -92,19 +177,19 @@ function loadSessions() {
     // Ignore corrupted local history.
   }
 
-  return DEFAULT_SESSIONS;
+  return config.defaultSessions;
 }
 
-function saveSessions(sessions) {
-  localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+function saveSessions(storageKey, sessions) {
+  localStorage.setItem(storageKey, JSON.stringify(sessions));
 }
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function createInitialChatState() {
-  const sessions = loadSessions();
+function createInitialChatState(config) {
+  const sessions = loadSessions(config);
 
   return {
     sessions,
@@ -219,8 +304,9 @@ function AiIcon({ name, size = 18 }) {
   return icons[name] || null;
 }
 
-export default function AiChatPage() {
-  const [initialChatState] = useState(createInitialChatState);
+export default function AiChatPage({ variant = 'petani' }) {
+  const config = AI_CONFIGS[variant] || AI_CONFIGS.petani;
+  const [initialChatState] = useState(() => createInitialChatState(config));
   const [sessions, setSessions] = useState(initialChatState.sessions);
   const [activeSessionId, setActiveSessionId] = useState(initialChatState.activeSessionId);
   const [input, setInput] = useState('');
@@ -279,7 +365,7 @@ export default function AiChatPage() {
     };
 
     setSessions(nextSessions);
-    saveSessions(nextSessions);
+    saveSessions(config.storageKeySessions, nextSessions);
     setInput('');
     setError('');
     setLoading(true);
@@ -287,6 +373,7 @@ export default function AiChatPage() {
     try {
       const { data } = await aiService.chat({
         message: cleanQuestion,
+        roleContext: config.context,
         history: prevMessages.map((message) => ({
           role: message.role,
           content: message.content,
@@ -308,9 +395,9 @@ export default function AiChatPage() {
                  createdAt: getTimeLabel(),
                }
              ],
-             updatedAt: Date.now()
+           updatedAt: Date.now()
            };
-           saveSessions(updatedSessions);
+           saveSessions(config.storageKeySessions, updatedSessions);
         }
         return updatedSessions;
       });
@@ -334,7 +421,7 @@ export default function AiChatPage() {
     if (window.confirm('Yakin ingin menghapus obrolan ini?')) {
       setSessions(prev => {
         const nextSessions = prev.filter(s => s.id !== sessionId);
-        saveSessions(nextSessions);
+        saveSessions(config.storageKeySessions, nextSessions);
         return nextSessions;
       });
       if (activeSessionId === sessionId) {
@@ -348,7 +435,7 @@ export default function AiChatPage() {
     if (window.confirm('Yakin ingin menghapus semua riwayat percakapan?')) {
       setSessions([]);
       setActiveSessionId(null);
-      saveSessions([]);
+      saveSessions(config.storageKeySessions, []);
       setError('');
     }
   };
@@ -360,8 +447,8 @@ export default function AiChatPage() {
           <AiIcon name="sparkle" size={34} />
         </span>
         <div>
-          <h1>Tanya Ai</h1>
-          <p>Dapatkan rekomendasi dan jawaban seputar pertanian dari Ai.</p>
+          <h1>{config.heading}</h1>
+          <p>{config.subtitle}</p>
         </div>
       </header>
 
@@ -371,20 +458,20 @@ export default function AiChatPage() {
             {messages.length === 0 && (
               <div className="ai-empty-state">
                 <AiIcon name="plant" size={24} />
-                <strong>Mulai percakapan pertanian</strong>
-                <p>Pilih topik populer atau tulis pertanyaan tentang lahan, panen, hama, dan peningkatan potensi.</p>
+                <strong>{config.emptyTitle}</strong>
+                <p>{config.emptyText}</p>
               </div>
             )}
 
             {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+              <ChatMessage key={message.id} message={message} tipLabel={config.tipLabel} />
             ))}
 
             {loading && (
               <div className="ai-message-row assistant">
                 <span className="ai-avatar" />
                 <div className="ai-bubble assistant">
-                  <span className="ai-typing">Ai sedang menyusun rekomendasi...</span>
+                  <span className="ai-typing">{config.typingText}</span>
                 </div>
               </div>
             )}
@@ -402,7 +489,7 @@ export default function AiChatPage() {
                   sendQuestion(input);
                 }
               }}
-              placeholder="Tanyakan apa saja tentang pertanian..."
+              placeholder={config.placeholder}
               disabled={loading}
             />
             <span>{input.length}/{MAX_MESSAGE_LENGTH}</span>
@@ -421,7 +508,7 @@ export default function AiChatPage() {
             <h2>Topik Populer</h2>
 
             <div className="ai-topic-list">
-              {TOPICS.map((topic) => (
+              {config.topics.map((topic) => (
                 <button
                   type="button"
                   className="ai-topic-item"
@@ -498,7 +585,7 @@ function TopicIcon({ title }) {
   return <AiIcon name="plant" size={18} />;
 }
 
-function ChatMessage({ message }) {
+function ChatMessage({ message, tipLabel }) {
   const isUser = message.role === 'user';
 
   return (
@@ -513,7 +600,7 @@ function ChatMessage({ message }) {
             <div className="ai-tip-box">
               <strong>
                 <AiIcon name="sparkle" size={14} />
-                Tips AgroAi
+                {tipLabel}
               </strong>
               <p>{message.tip}</p>
             </div>

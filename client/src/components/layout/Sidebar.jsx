@@ -29,12 +29,23 @@ const navByRole = {
 
   pengurus: [
     {
-      group: 'MANAJEMEN DESA',
+      group: 'LAHAN SAYA',
       items: [
         { to: '/pengurus/dashboard', label: 'Dashboard', icon: 'home' },
+        { to: '/pengurus/potensi', label: 'Potensi Desa', icon: 'chart' },
         { to: '/pengurus/peta', label: 'Peta Komoditas', icon: 'map' },
-        { to: '/pengurus/laporan', label: 'Laporan Potensi', icon: 'report' },
-        { to: '/pengurus/rekomendasi', label: 'Rekomendasi AI', icon: 'sparkles' },
+        { to: '/pengurus/laporan', label: 'Laporan potensi', icon: 'leaf' },
+        {
+          to: '/pengurus/lahan-tidak-termanfaatkan',
+          label: 'Lahan Tidak Termanfaatkan',
+          icon: 'alert',
+        },
+      ],
+    },
+    {
+      group: 'AI',
+      items: [
+        { to: '/pengurus/rekomendasi', label: 'Tanya AI', icon: 'chat' },
       ],
     },
   ],
@@ -54,22 +65,23 @@ const navByRole = {
     {
       group: '',
       items: [
-        { to: '/wisata/dashboard', label: 'Ringkasan', icon: 'home' },
-        { to: '/wisata/data', label: 'Data Wisata', icon: 'data' },
-        { to: '/wisata/pengunjung', label: 'Kunjungan', icon: 'users' },
-        { to: '/wisata/laporan', label: 'Laporan', icon: 'report' },
+        { to: '/wisata/dashboard', label: 'Beranda', icon: 'home' },
+        {
+          to: '/wisata/laporan',
+          label: 'Laporan Pengunjung',
+          icon: 'report',
+          children: [
+            { to: '/wisata/laporan', label: 'Buat Laporan' },
+            { to: '/wisata/laporan/riwayat', label: 'Riwayat Laporan' },
+          ],
+        },
+        { to: '/wisata/kendala', label: 'Lapor Kendala', icon: 'alert' },
       ],
     },
     {
       group: 'LIHAT PETA',
       items: [
         { to: '/wisata/lokasi', label: 'Lokasi Wisata', icon: 'map-pin' },
-      ],
-    },
-    {
-      group: 'AI',
-      items: [
-        { to: '/wisata/rekomendasi', label: 'Tanya AI', icon: 'chat' },
       ],
     },
   ],
@@ -152,6 +164,14 @@ const sidebarIcons = {
       <path d="M16 14c2.2.3 3.7 1.9 4.5 5" />
     </>
   ),
+  chart: (
+    <>
+      <path d="M5 20V11" />
+      <path d="M12 20V5" />
+      <path d="M19 20v-8" />
+      <path d="M3 20h18" />
+    </>
+  ),
   'file-search': (
     <>
       <path d="M6 3.5h8l4 4V20.5H6z" />
@@ -202,20 +222,47 @@ export default function Sidebar() {
 
             <nav>
               {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    isActive
-                      ? 'dashboard-nav-link is-active'
-                      : 'dashboard-nav-link'
-                  }
-                >
-                  <span className="dashboard-nav-icon" aria-hidden="true">
-                    <SidebarIcon name={item.icon} />
-                  </span>
-                  <span>{item.label}</span>
-                </NavLink>
+                <div className="dashboard-nav-item" key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    className={({ isActive }) =>
+                      isActive
+                        ? 'dashboard-nav-link is-active'
+                        : 'dashboard-nav-link'
+                    }
+                  >
+                    <span className="dashboard-nav-icon" aria-hidden="true">
+                      <SidebarIcon name={item.icon} />
+                    </span>
+                    <span>{item.label}</span>
+                    {item.children?.length ? (
+                      <span className="dashboard-nav-chevron" aria-hidden="true">
+                        <svg viewBox="0 0 20 20" focusable="false">
+                          <path d="m5 7 5 5 5-5" />
+                        </svg>
+                      </span>
+                    ) : null}
+                  </NavLink>
+
+                  {item.children?.length ? (
+                    <div className="dashboard-nav-children">
+                      {item.children.map((child) => (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          end={child.to === item.to}
+                          className={({ isActive }) =>
+                            isActive
+                              ? 'dashboard-nav-child-link is-active'
+                              : 'dashboard-nav-child-link'
+                          }
+                        >
+                          {child.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </nav>
           </section>

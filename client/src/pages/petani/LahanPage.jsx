@@ -367,13 +367,13 @@ function getPolygonPoints(item) {
   if (typeof polygon === 'string') {
     try {
       const parsed = JSON.parse(polygon);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? sortPolygonPoints(parsed) : [];
     } catch {
       return [];
     }
   }
 
-  return Array.isArray(polygon) ? polygon : [];
+  return Array.isArray(polygon) ? sortPolygonPoints(polygon) : [];
 }
 
 function getPolygonCenter(points) {
@@ -393,6 +393,27 @@ function getPolygonCenter(points) {
     Number((total.lat / points.length).toFixed(8)),
     Number((total.lng / points.length).toFixed(8)),
   ];
+}
+
+function sortPolygonPoints(points) {
+  if (!Array.isArray(points)) return [];
+
+  const validPoints = points
+    .map((point) => [Number(point?.[0]), Number(point?.[1])])
+    .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]));
+
+  if (validPoints.length < 3) return validPoints;
+
+  const center = getPolygonCenter(validPoints);
+
+  if (!center) return validPoints;
+
+  return [...validPoints].sort((a, b) => {
+    const angleA = Math.atan2(a[0] - center[0], a[1] - center[1]);
+    const angleB = Math.atan2(b[0] - center[0], b[1] - center[1]);
+
+    return angleA - angleB;
+  });
 }
 
 function DetailInfoItem({ icon, label, value, children }) {
@@ -442,6 +463,10 @@ export default function LahanPage() {
 
   const polygonCenter = useMemo(() => {
     return getPolygonCenter(polygonPoints);
+  }, [polygonPoints]);
+
+  const orderedPolygonPoints = useMemo(() => {
+    return sortPolygonPoints(polygonPoints);
   }, [polygonPoints]);
 
   const activeMapPosition = selectedPosition || polygonCenter;
@@ -737,10 +762,11 @@ export default function LahanPage() {
 
     setPolygonPoints((previous) => {
       const next = [...previous, nextPoint];
+      const orderedNext = sortPolygonPoints(next);
 
       setForm((prevForm) => ({
         ...prevForm,
-        polygon_lahan: next,
+        polygon_lahan: orderedNext,
       }));
 
       return next;
@@ -759,13 +785,14 @@ export default function LahanPage() {
 
         return point;
       });
+      const orderedNext = sortPolygonPoints(next);
 
-      const center = getPolygonCenter(next);
+      const center = getPolygonCenter(orderedNext);
       const locationLabel = center ? formatCoordinateLabel(center[0], center[1]) : '';
 
       setForm((prevForm) => ({
         ...prevForm,
-        polygon_lahan: next,
+        polygon_lahan: orderedNext,
         latitude: center ? String(center[0]) : prevForm.latitude,
         longitude: center ? String(center[1]) : prevForm.longitude,
         lokasi_lahan: locationLabel || prevForm.lokasi_lahan,
@@ -793,14 +820,16 @@ export default function LahanPage() {
       return;
     }
 
-    const center = getPolygonCenter(polygonPoints);
+    const orderedPoints = sortPolygonPoints(polygonPoints);
+    const center = getPolygonCenter(orderedPoints);
     const locationLabel = center ? formatCoordinateLabel(center[0], center[1]) : '';
 
     setIsDrawingPolygon(false);
+    setPolygonPoints(orderedPoints);
 
     setForm((previous) => ({
       ...previous,
-      polygon_lahan: polygonPoints,
+      polygon_lahan: orderedPoints,
       latitude: previous.latitude || String(center?.[0] || ''),
       longitude: previous.longitude || String(center?.[1] || ''),
       lokasi_lahan: locationLabel || previous.lokasi_lahan,
@@ -860,6 +889,7 @@ export default function LahanPage() {
         savedLocationText && savedLocationText !== 'Lokasi belum diisi';
       const nextLatitude = form.latitude || savedLatitude;
       const nextLongitude = form.longitude || savedLongitude;
+      const orderedPayloadPolygon = sortPolygonPoints(polygonPoints);
 
       const payload = {
         ...form,
@@ -870,7 +900,7 @@ export default function LahanPage() {
           form.lokasi_lahan || (hasSavedLocationText ? savedLocationText : null),
         latitude: nextLatitude ? Number(nextLatitude) : null,
         longitude: nextLongitude ? Number(nextLongitude) : null,
-        polygon_lahan: polygonPoints.length >= 3 ? polygonPoints : null,
+        polygon_lahan: orderedPayloadPolygon.length >= 3 ? orderedPayloadPolygon : null,
         tanggal_tanam_terakhir: form.tanggal_tanam_terakhir || null,
       };
 
@@ -1014,9 +1044,9 @@ export default function LahanPage() {
                   selectedPosition={activeMapPosition}
                 />
 
-                {polygonPoints.length >= 3 && (
+                {orderedPolygonPoints.length >= 3 && (
                   <Polygon
-                    positions={polygonPoints}
+                    positions={orderedPolygonPoints}
                     pathOptions={{
                       color: '#facc15',
                       weight: 4,
@@ -1218,9 +1248,9 @@ export default function LahanPage() {
               })}
 
               {/* Polygon yang sedang dibuat / diedit */}
-              {polygonPoints.length >= 2 && (
+              {orderedPolygonPoints.length >= 2 && (
                 <Polygon
-                  positions={polygonPoints}
+                  positions={orderedPolygonPoints}
                   pathOptions={{
                     color: '#facc15',
                     weight: 4,

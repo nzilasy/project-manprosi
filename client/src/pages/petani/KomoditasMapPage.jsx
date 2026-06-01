@@ -350,9 +350,32 @@ function getPolygonPoints(item) {
 
   if (!Array.isArray(points)) return [];
 
-  return points
+  const validPoints = points
     .map((point) => [Number(point[0]), Number(point[1])])
     .filter((point) => !Number.isNaN(point[0]) && !Number.isNaN(point[1]));
+
+  return sortPolygonPoints(validPoints);
+}
+
+function sortPolygonPoints(points) {
+  if (!Array.isArray(points) || points.length < 3) return points || [];
+
+  const center = points.reduce(
+    (total, point) => ({
+      lat: total.lat + point[0],
+      lng: total.lng + point[1],
+    }),
+    { lat: 0, lng: 0 },
+  );
+  const centerLat = center.lat / points.length;
+  const centerLng = center.lng / points.length;
+
+  return [...points].sort((a, b) => {
+    const angleA = Math.atan2(a[0] - centerLat, a[1] - centerLng);
+    const angleB = Math.atan2(b[0] - centerLat, b[1] - centerLng);
+
+    return angleA - angleB;
+  });
 }
 
 function getLahanPosition(item) {

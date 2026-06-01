@@ -169,31 +169,6 @@
   box-shadow: 0 0 0 2px rgba(87, 117, 104, 0.14);
 }
 
-.kendala-location-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 14px;
-}
-
-.kendala-location-button {
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid #dbe3ea;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #64748b;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.kendala-location-button:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
 .kendala-photo-list {
   display: flex;
   flex-wrap: wrap;
@@ -481,7 +456,6 @@
 
 @media (max-width: 980px) {
   .kendala-form-grid,
-  .kendala-location-row,
   .kendala-side-column {
     grid-template-columns: 1fr;
   }

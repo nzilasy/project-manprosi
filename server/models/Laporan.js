@@ -9,7 +9,7 @@ const Laporan = sequelize.define('Laporan', {
   kategori: { type: DataTypes.STRING(80), allowNull: true },
   tingkat_keparahan: { type: DataTypes.STRING(50), allowNull: true },
   lokasi_kendala: { type: DataTypes.STRING(255), allowNull: true },
-  status: { type: DataTypes.STRING(50), defaultValue: 'baru' },
+  status: { type: DataTypes.STRING(50), defaultValue: 'belum_diproses' },
   judul: { type: DataTypes.STRING(150) },
   deskripsi: { type: DataTypes.TEXT },
   tanggal: { type: DataTypes.DATEONLY },

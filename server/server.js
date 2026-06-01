@@ -17,6 +17,7 @@ const laporanRoutes = require('./routes/laporanRoutes');
 const wisataRoutes = require('./routes/wisataRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const kunjunganWisataRoutes = require('./routes/kunjunganWisataRoutes');
+const kendalaWisataRoutes = require('./routes/kendalaWisataRoutes');
 
 const { logger } = require('./middleware/loggerMiddleware');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
@@ -38,6 +39,7 @@ app.use('/api/laporan', laporanRoutes);
 app.use('/api/wisata', wisataRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/kunjungan-wisata', kunjunganWisataRoutes);
+app.use('/api/kendala-wisata', kendalaWisataRoutes);
 
 // Route tes dasar
 app.get('/', (req, res) => {
