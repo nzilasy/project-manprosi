@@ -149,12 +149,6 @@ function KendalaIcon({ name, size = 18 }) {
         <circle cx="12" cy="9" r="2.5" />
       </svg>
     ),
-    send: (
-      <svg {...commonProps}>
-        <path d="m22 2-7 20-4-9-9-4 20-7Z" />
-        <path d="M22 2 11 13" />
-      </svg>
-    ),
     upload: (
       <svg {...commonProps}>
         <path d="M12 16V4" />
@@ -203,7 +197,6 @@ export default function KendalaPage() {
   const [photoPreviews, setPhotoPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -358,36 +351,6 @@ export default function KendalaPage() {
     URL.revokeObjectURL(url);
     objectUrlsRef.current = objectUrlsRef.current.filter((item) => item !== url);
     setPhotoPreviews((current) => current.filter((item) => item.url !== url));
-  };
-
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setError('Browser tidak mendukung akses lokasi.');
-      return;
-    }
-
-    setLocating(true);
-    setError('');
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setForm((current) => ({
-          ...current,
-          lokasi_kendala: `${position.coords.latitude.toFixed(
-            6,
-          )}, ${position.coords.longitude.toFixed(6)}`,
-        }));
-        setLocating(false);
-      },
-      () => {
-        setError('Gagal mengambil lokasi saat ini.');
-        setLocating(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-      },
-    );
   };
 
   const resetForm = () => {
@@ -557,28 +520,16 @@ export default function KendalaPage() {
 
             <label className="kendala-wide-field">
               <span>Lokasi Kendala</span>
-              <div className="kendala-location-row">
-                <div className="kendala-icon-input">
-                  <KendalaIcon name="location" />
-                  <input
-                    type="text"
-                    value={form.lokasi_kendala}
-                    onChange={(event) =>
-                      handleChange('lokasi_kendala', event.target.value)
-                    }
-                    placeholder="Cihareang, Kec. Cimahi, Kab. Kuningan, Jawa Barat"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  className="kendala-location-button"
-                  onClick={handleUseCurrentLocation}
-                  disabled={locating}
-                >
-                  <KendalaIcon name="send" />
-                  {locating ? 'Mengambil lokasi...' : 'Gunakan Lokasi saya'}
-                </button>
+              <div className="kendala-icon-input">
+                <KendalaIcon name="location" />
+                <input
+                  type="text"
+                  value={form.lokasi_kendala}
+                  onChange={(event) =>
+                    handleChange('lokasi_kendala', event.target.value)
+                  }
+                  placeholder="Cihareang, Kec. Cimahi, Kab. Kuningan, Jawa Barat"
+                />
               </div>
             </label>
 

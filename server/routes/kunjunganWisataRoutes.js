@@ -61,18 +61,88 @@ function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const INDONESIAN_PROVINCES = [
+  'aceh',
+  'sumatera utara',
+  'sumatera barat',
+  'riau',
+  'kepulauan riau',
+  'jambi',
+  'sumatera selatan',
+  'bengkulu',
+  'lampung',
+  'kepulauan bangka belitung',
+  'banten',
+  'dki jakarta',
+  'jawa barat',
+  'jawa tengah',
+  'di yogyakarta',
+  'jawa timur',
+  'bali',
+  'nusa tenggara barat',
+  'nusa tenggara timur',
+  'kalimantan barat',
+  'kalimantan tengah',
+  'kalimantan selatan',
+  'kalimantan timur',
+  'kalimantan utara',
+  'sulawesi utara',
+  'sulawesi tengah',
+  'sulawesi selatan',
+  'sulawesi tenggara',
+  'gorontalo',
+  'sulawesi barat',
+  'maluku',
+  'maluku utara',
+  'papua',
+  'papua barat',
+  'papua barat daya',
+  'papua tengah',
+  'papua pegunungan',
+  'papua selatan',
+];
+
+function normalizeLocationPart(value) {
+  return String(value || '').trim();
+}
+
+function uniqueLocationParts(parts) {
+  const seen = new Set();
+
+  return parts
+    .map(normalizeLocationPart)
+    .filter(Boolean)
+    .filter((part) => {
+      const key = part.toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+}
+
 function getLocationText(lokasi) {
   if (!lokasi) return 'Lokasi belum diisi';
 
-  return [
-    lokasi.nama_lokasi,
+  const locationParts = uniqueLocationParts([
+    lokasi.alamat,
     lokasi.desa_kelurahan,
     lokasi.kecamatan,
     lokasi.kabupaten_kota,
-    lokasi.provinsi,
-  ]
-    .filter(Boolean)
-    .join(', ') || lokasi.alamat || 'Lokasi belum diisi';
+  ]);
+  const province = normalizeLocationPart(lokasi.provinsi);
+  const locationText = locationParts.join(', ').toLowerCase();
+  const provinceKey = province.toLowerCase();
+  const hasDifferentProvinceInInput = INDONESIAN_PROVINCES.some(
+    (item) => item !== provinceKey && locationText.includes(item)
+  );
+  const shouldShowProvince =
+    province && !locationText.includes(provinceKey) && !hasDifferentProvinceInInput;
+
+  return uniqueLocationParts([...locationParts, shouldShowProvince ? province : null]).join(', ')
+    || lokasi.nama_lokasi
+    || 'Lokasi belum diisi';
 }
 
 function serializeWisata(row) {

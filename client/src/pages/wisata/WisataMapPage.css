@@ -122,6 +122,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.wisata-add-form-grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .wisata-add-form label {
   display: grid;
   gap: 7px;
@@ -1094,7 +1098,8 @@
   }
 
   .wisata-add-form-grid,
-  .wisata-add-form-grid.three {
+  .wisata-add-form-grid.three,
+  .wisata-add-form-grid.four {
     grid-template-columns: 1fr;
   }
 

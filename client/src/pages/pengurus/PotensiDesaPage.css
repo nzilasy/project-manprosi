@@ -1,0 +1,361 @@
+.potensi-page {
+  min-height: 100%;
+  color: #172033;
+}
+
+.potensi-header {
+  margin-bottom: 46px;
+}
+
+.potensi-header h1 {
+  margin: 0;
+  color: #172033;
+  font-size: 32px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.potensi-header p {
+  margin: 6px 0 0;
+  color: #7890ab;
+  font-size: 16px;
+}
+
+.potensi-message {
+  margin: -24px 0 20px;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.potensi-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 370px;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 52px;
+}
+
+.potensi-map-section h2,
+.potensi-list-card h2,
+.potensi-summary-section h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.potensi-map-section h2 {
+  margin: 0 0 18px 6px;
+}
+
+.potensi-map-card {
+  position: relative;
+  height: 382px;
+  overflow: hidden;
+  border: 1px solid #d9e3ec;
+  border-radius: 12px;
+  background: #d1d5db;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.1);
+}
+
+.potensi-map {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.potensi-map-card .leaflet-control-container .leaflet-top.leaflet-left {
+  top: auto;
+  bottom: 18px;
+  left: 18px;
+}
+
+.potensi-map-card .leaflet-control-zoom {
+  border: 0;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+.potensi-map-card .leaflet-control-zoom a {
+  color: #172033;
+  font-weight: 850;
+}
+
+.potensi-map-card .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.2);
+}
+
+.potensi-map-card .leaflet-popup-content {
+  width: 220px;
+  margin: 0;
+}
+
+.potensi-popup {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.potensi-popup h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.potensi-popup p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.potensi-popup span {
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.potensi-map-marker {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 5px solid rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.24);
+}
+
+.potensi-map-marker svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.potensi-map-legend {
+  position: absolute;
+  top: 34px;
+  right: 34px;
+  z-index: 500;
+  display: grid;
+  gap: 12px;
+  min-width: 190px;
+  padding: 18px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+}
+
+.potensi-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.potensi-map-legend i {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+}
+
+.potensi-map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.46);
+  color: #172033;
+  font-weight: 900;
+}
+
+.potensi-list-card {
+  min-height: 332px;
+  display: grid;
+  align-content: start;
+  gap: 28px;
+  padding: 28px 24px;
+  border: 1px solid #e6edf3;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.09);
+}
+
+.potensi-list {
+  display: grid;
+  gap: 30px;
+}
+
+.potensi-list-item {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.potensi-list-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.potensi-list-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.potensi-list-item strong {
+  display: block;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.potensi-list-item span {
+  display: block;
+  margin-top: 4px;
+  color: #7890ab;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.potensi-list-item small {
+  display: inline-flex;
+  align-items: center;
+  height: 25px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.potensi-summary-section {
+  display: grid;
+  gap: 28px;
+}
+
+.potensi-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 34px;
+}
+
+.potensi-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 96px;
+  padding: 20px;
+  border: 1px solid #e6edf3;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.potensi-summary-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  flex: 0 0 48px;
+}
+
+.potensi-summary-icon.green {
+  background: #10b96f;
+}
+
+.potensi-summary-icon.orange {
+  background: #f97316;
+}
+
+.potensi-summary-icon.red {
+  background: #ef1f1f;
+}
+
+.potensi-summary-icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.potensi-summary-card span {
+  display: block;
+  color: #9aabc0;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.potensi-summary-card strong {
+  display: block;
+  margin-top: 2px;
+  color: #172033;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.potensi-summary-card small {
+  display: block;
+  margin-top: 4px;
+  color: #7890ab;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+@media (max-width: 1180px) {
+  .potensi-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .potensi-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .potensi-header {
+    margin-bottom: 28px;
+  }
+
+  .potensi-header h1 {
+    font-size: 27px;
+  }
+
+  .potensi-map-card {
+    height: 360px;
+  }
+
+  .potensi-map-legend {
+    top: 16px;
+    right: 16px;
+    min-width: 160px;
+    padding: 14px;
+  }
+
+  .potensi-list-card {
+    padding: 22px 18px;
+  }
+
+  .potensi-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

@@ -14,7 +14,8 @@ import { wisataService } from '../../services/wisataService';
 import './DashboardPage.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEAR_OPTIONS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2];
+const YEAR_OPTIONS = [2026, 2027, 2028];
+const DEFAULT_YEAR = YEAR_OPTIONS.includes(CURRENT_YEAR) ? CURRENT_YEAR : YEAR_OPTIONS[0];
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=900&q=80';
@@ -97,7 +98,7 @@ function DashboardIcon({ name, size = 20 }) {
 
 export default function WisataDashboard() {
   const { user } = useAuth();
-  const [year, setYear] = useState(CURRENT_YEAR);
+  const [year, setYear] = useState(DEFAULT_YEAR);
   const [summary, setSummary] = useState(null);
   const [wisataList, setWisataList] = useState([]);
   const [form, setForm] = useState(INITIAL_FORM);

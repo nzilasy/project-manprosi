@@ -36,7 +36,7 @@ const ADD_WISATA_INITIAL_FORM = {
   desa_kelurahan: '',
   kecamatan: '',
   kabupaten_kota: '',
-  provinsi: 'Jawa Barat',
+  provinsi: '',
   latitude: '',
   longitude: '',
   harga_tiket: '',
@@ -428,7 +428,7 @@ function getWisataFormValues(item) {
     desa_kelurahan: lokasi.desa_kelurahan || '',
     kecamatan: lokasi.kecamatan || '',
     kabupaten_kota: lokasi.kabupaten_kota || '',
-    provinsi: lokasi.provinsi || 'Jawa Barat',
+    provinsi: lokasi.provinsi || '',
     latitude: position[0] === undefined ? '' : String(position[0]),
     longitude: position[1] === undefined ? '' : String(position[1]),
     harga_tiket: item.ticketPrice === null || item.ticketPrice === undefined
@@ -1158,7 +1158,7 @@ export default function WisataMapPage({ readOnly = false }) {
               />
             </label>
 
-            <div className="wisata-add-form-grid three">
+            <div className="wisata-add-form-grid four">
               <label>
                 Desa/Kelurahan
                 <input
@@ -1183,6 +1183,15 @@ export default function WisataMapPage({ readOnly = false }) {
                   value={addForm.kabupaten_kota}
                   onChange={(event) => handleAddFormChange('kabupaten_kota', event.target.value)}
                   placeholder="Sumedang"
+                />
+              </label>
+
+              <label>
+                Provinsi
+                <input
+                  value={addForm.provinsi}
+                  onChange={(event) => handleAddFormChange('provinsi', event.target.value)}
+                  placeholder="Jawa Tengah"
                 />
               </label>
             </div>

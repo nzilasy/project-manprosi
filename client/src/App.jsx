@@ -25,10 +25,15 @@ import PetaniWisataMapPage from './pages/petani/WisataMapPage';
 import AiChatPage from './pages/petani/AiChatPage';
 
 import PengurusDashboard from './pages/pengurus/DashboardPage';
+import PotensiDesaPage from './pages/pengurus/PotensiDesaPage';
+import LaporanPotensiPage from './pages/pengurus/LaporanPotensiPage';
+import LahanTidakTermanfaatkanPage from './pages/pengurus/LahanTidakTermanfaatkanPage';
 import MasyarakatDashboard from './pages/masyarakat/DashboardPage';
 import MasyarakatWisataMapPage from './pages/masyarakat/WisataMapPage';
 import MasyarakatKomoditasMapPage from './pages/masyarakat/KomoditasMapPage';
 import WisataDashboard from './pages/wisata/DashboardPage';
+import WisataKunjunganPage from './pages/wisata/KunjunganPage';
+import WisataKendalaPage from './pages/wisata/KendalaPage';
 import WisataMapPage from './pages/wisata/WisataMapPage';
 
 const queryClient = new QueryClient();
@@ -64,6 +69,14 @@ export default function App() {
             <Route element={<ProtectedRoute roles={['pengurus']} />}>
               <Route element={<DashboardLayout />}>
                 <Route path="/pengurus/dashboard" element={<PengurusDashboard />} />
+                <Route path="/pengurus/potensi" element={<PotensiDesaPage />} />
+                <Route path="/pengurus/peta" element={<MasyarakatKomoditasMapPage />} />
+                <Route path="/pengurus/laporan" element={<LaporanPotensiPage />} />
+                <Route
+                  path="/pengurus/lahan-tidak-termanfaatkan"
+                  element={<LahanTidakTermanfaatkanPage />}
+                />
+                <Route path="/pengurus/rekomendasi" element={<AiChatPage variant="pengurus" />} />
               </Route>
             </Route>
 
@@ -81,10 +94,12 @@ export default function App() {
               <Route element={<DashboardLayout />}>
                 <Route path="/wisata/dashboard" element={<WisataDashboard />} />
                 <Route path="/wisata/data" element={<ComingSoonPage title="Data Wisata" />} />
-                <Route path="/wisata/pengunjung" element={<ComingSoonPage title="Kunjungan" />} />
-                <Route path="/wisata/laporan" element={<ComingSoonPage title="Laporan" />} />
+                <Route path="/wisata/laporan" element={<WisataKunjunganPage />} />
+                <Route path="/wisata/laporan/riwayat" element={<WisataKunjunganPage />} />
+                <Route path="/wisata/pengunjung" element={<WisataKunjunganPage />} />
+                <Route path="/wisata/pengunjung/riwayat" element={<WisataKunjunganPage />} />
+                <Route path="/wisata/kendala" element={<WisataKendalaPage />} />
                 <Route path="/wisata/lokasi" element={<WisataMapPage />} />
-                <Route path="/wisata/rekomendasi" element={<ComingSoonPage title="Tanya AI" />} />
               </Route>
             </Route>
 

@@ -1,5 +1,16 @@
 const express = require('express');
-const { Lahan, Komoditas, Lokasi, Panen } = require('../models/index');
+const {
+  Lahan,
+  Komoditas,
+  Lokasi,
+  Panen,
+  Peternakan,
+  Wisata,
+  KunjunganWisata,
+  KendalaWisata,
+  Laporan,
+  User,
+} = require('../models/index');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
@@ -24,6 +35,23 @@ Aturan jawaban:
    penyuluh pertanian setempat.
 6. Jika data tidak cukup, jelaskan data apa yang dibutuhkan.
 7. Jangan mengarang data lahan atau angka produksi yang tidak tersedia.
+`;
+
+const PENGURUS_SYSTEM_PROMPT = `
+Kamu adalah asisten AI untuk pengurus desa di aplikasi Agrosync/Potensi Desa.
+Tugasmu membantu pengurus desa membaca data potensi wilayah, laporan warga,
+lahan belum termanfaatkan, komoditas, peternakan, dan wisata desa.
+
+Aturan jawaban:
+1. Jawab hanya topik pengelolaan potensi desa, pertanian, peternakan, wisata,
+   laporan kendala, prioritas tindak lanjut, dan pemanfaatan lahan.
+2. Jika pertanyaan di luar topik, jawab singkat bahwa kamu hanya membantu
+   seputar potensi desa dan tindak lanjut laporan.
+3. Gunakan bahasa Indonesia yang sederhana, praktis, dan cocok untuk pengurus desa.
+4. Berikan rekomendasi berbentuk langkah kerja yang bisa diverifikasi di lapangan.
+5. Bedakan antara data yang tersedia dari aplikasi dan saran/inferensi AI.
+6. Jangan mengarang angka, lokasi, atau nama pelapor yang tidak tersedia.
+7. Jika data belum cukup, sebutkan data tambahan yang perlu dikumpulkan.
 `;
 
 function toPlain(row) {
@@ -89,6 +117,153 @@ function formatPanenContext(panenRows) {
     .join('\n');
 }
 
+function getLocationText(lokasi) {
+  if (!lokasi) return 'Lokasi belum diisi';
+
+  return (
+    lokasi.nama_lokasi ||
+    lokasi.alamat ||
+    [
+      lokasi.desa_kelurahan,
+      lokasi.kecamatan,
+      lokasi.kabupaten_kota,
+    ].filter(Boolean).join(', ') ||
+    'Lokasi belum diisi'
+  );
+}
+
+function formatPengurusLahanContext(lahanRows) {
+  if (lahanRows.length === 0) {
+    return 'Data lahan/potensi pertanian belum tersedia.';
+  }
+
+  return lahanRows
+    .map((row, index) => {
+      const item = toPlain(row);
+      const komoditas = item.komoditas?.nama_komoditas || 'Komoditas belum diisi';
+      const lokasi = item.lokasi_lahan || item.nama_tempat || getLocationText(item.lokasi);
+      const pelapor = item.user?.name || 'Petani';
+
+      return [
+        `${index + 1}. ${item.nama_lahan}`,
+        `komoditas: ${komoditas}`,
+        `luas: ${formatNumber(item.luas)} ${item.satuan_luas || 'ha'}`,
+        `status: ${item.status || '-'}`,
+        `lokasi: ${lokasi}`,
+        `pelapor: ${pelapor}`,
+      ].join(' | ');
+    })
+    .join('\n');
+}
+
+function formatPeternakanContext(peternakanRows) {
+  if (peternakanRows.length === 0) {
+    return 'Data peternakan belum tersedia.';
+  }
+
+  return peternakanRows
+    .map((row, index) => {
+      const item = toPlain(row);
+      const lokasi = getLocationText(item.Lokasi);
+      const pelapor = item.User?.name || 'Peternak';
+
+      return [
+        `${index + 1}. ${item.nama_peternakan || 'Peternakan tanpa nama'}`,
+        `jenis: ${item.jenis_ternak || '-'}`,
+        `skala: ${item.skala || '-'}`,
+        `status: ${item.status || '-'}`,
+        `lokasi: ${lokasi}`,
+        `pelapor: ${pelapor}`,
+      ].join(' | ');
+    })
+    .join('\n');
+}
+
+function formatLaporanContext(laporanRows) {
+  if (laporanRows.length === 0) {
+    return 'Data laporan kendala pertanian/peternakan belum tersedia.';
+  }
+
+  return laporanRows
+    .map((row, index) => {
+      const item = toPlain(row);
+      const pelapor = item.User?.name || 'Pelapor';
+
+      return [
+        `${index + 1}. ${item.judul || 'Laporan tanpa judul'}`,
+        `kategori: ${item.kategori || item.reportable_type || '-'}`,
+        `status: ${item.status || '-'}`,
+        `tingkat: ${item.tingkat_keparahan || '-'}`,
+        `tanggal: ${item.tanggal || '-'}`,
+        `lokasi: ${item.lokasi_kendala || 'Lokasi belum diisi'}`,
+        `pelapor: ${pelapor}`,
+      ].join(' | ');
+    })
+    .join('\n');
+}
+
+function formatWisataContext(wisataRows) {
+  if (wisataRows.length === 0) {
+    return 'Data wisata belum tersedia.';
+  }
+
+  return wisataRows
+    .map((row, index) => {
+      const item = toPlain(row);
+
+      return [
+        `${index + 1}. ${item.nama_wisata || 'Wisata tanpa nama'}`,
+        `jenis: ${item.jenis_wisata || '-'}`,
+        `status: ${item.status || '-'}`,
+        `rating: ${formatNumber(item.rating)} (${formatNumber(item.jumlah_ulasan)} ulasan)`,
+        `fasilitas: ${item.fasilitas || '-'}`,
+        `lokasi: ${getLocationText(item.Lokasi)}`,
+      ].join(' | ');
+    })
+    .join('\n');
+}
+
+function formatKendalaWisataContext(kendalaRows) {
+  if (kendalaRows.length === 0) {
+    return 'Data kendala wisata belum tersedia.';
+  }
+
+  return kendalaRows
+    .map((row, index) => {
+      const item = toPlain(row);
+
+      return [
+        `${index + 1}. ${item.judul || 'Kendala tanpa judul'}`,
+        `wisata: ${item.wisata?.nama_wisata || '-'}`,
+        `kategori: ${item.kategori || '-'}`,
+        `status: ${item.status || '-'}`,
+        `tingkat: ${item.tingkat_keparahan || '-'}`,
+        `tanggal: ${item.tanggal || '-'}`,
+        `lokasi: ${item.lokasi_kendala || getLocationText(item.wisata?.Lokasi)}`,
+      ].join(' | ');
+    })
+    .join('\n');
+}
+
+function formatKunjunganContext(kunjunganRows) {
+  if (kunjunganRows.length === 0) {
+    return 'Data kunjungan wisata belum tersedia.';
+  }
+
+  return kunjunganRows
+    .map((row, index) => {
+      const item = toPlain(row);
+
+      return [
+        `${index + 1}. ${item.wisata?.nama_wisata || 'Wisata'}`,
+        `tanggal: ${item.tanggal_kunjungan || '-'}`,
+        `jumlah: ${formatNumber(item.jumlah_pengunjung)} pengunjung`,
+        `asal: ${item.asal_pengunjung || '-'}`,
+      ].join(' | ');
+    })
+    .join('\n');
+}
+
 async function getAgricultureContext(userId) {
   const [lahanRows, panenRows] = await Promise.all([
     Lahan.findAll({
@@ -137,6 +312,120 @@ async function getAgricultureContext(userId) {
   ].join('\n');
 }
 
+async function getPengurusContext() {
+  const [lahanRows, peternakanRows, laporanRows, wisataRows, kendalaWisataRows, kunjunganRows] =
+    await Promise.all([
+      Lahan.findAll({
+        include: [
+          {
+            model: Komoditas,
+            as: 'komoditas',
+            attributes: ['nama_komoditas'],
+          },
+          {
+            model: Lokasi,
+            as: 'lokasi',
+            required: false,
+          },
+          {
+            model: User,
+            as: 'user',
+            attributes: ['name'],
+            required: false,
+          },
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 12,
+      }),
+      Peternakan.findAll({
+        include: [
+          {
+            model: Lokasi,
+            required: false,
+          },
+          {
+            model: User,
+            attributes: ['name'],
+            required: false,
+          },
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 8,
+      }),
+      Laporan.findAll({
+        include: [
+          {
+            model: User,
+            attributes: ['name'],
+            required: false,
+          },
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 10,
+      }),
+      Wisata.findAll({
+        include: [
+          {
+            model: Lokasi,
+            required: false,
+          },
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 8,
+      }),
+      KendalaWisata.findAll({
+        include: [
+          {
+            model: Wisata,
+            as: 'wisata',
+            include: [
+              {
+                model: Lokasi,
+                required: false,
+              },
+            ],
+            required: false,
+          },
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 10,
+      }),
+      KunjunganWisata.findAll({
+        include: [
+          {
+            model: Wisata,
+            as: 'wisata',
+            required: false,
+          },
+        ],
+        order: [['tanggal_kunjungan', 'DESC']],
+        limit: 10,
+      }),
+    ]);
+
+  return [
+    'Konteks data pengurus desa dari aplikasi:',
+    '',
+    'Potensi pertanian/lahan:',
+    formatPengurusLahanContext(lahanRows),
+    '',
+    'Potensi peternakan:',
+    formatPeternakanContext(peternakanRows),
+    '',
+    'Laporan kendala pertanian/peternakan terbaru:',
+    formatLaporanContext(laporanRows),
+    '',
+    'Data wisata:',
+    formatWisataContext(wisataRows),
+    '',
+    'Kendala wisata terbaru:',
+    formatKendalaWisataContext(kendalaWisataRows),
+    '',
+    'Kunjungan wisata terbaru:',
+    formatKunjunganContext(kunjunganRows),
+  ].join('\n');
+}
+
 function normalizeHistory(history) {
   if (!Array.isArray(history)) return [];
 
@@ -154,7 +443,15 @@ function getGeminiText(data) {
   return parts.map((part) => part.text || '').join('\n').trim();
 }
 
-async function callGemini({ apiKey, model, message, history, context }) {
+async function callGemini({
+  apiKey,
+  model,
+  message,
+  history,
+  context,
+  systemPrompt = SYSTEM_PROMPT,
+  questionLabel = 'Pertanyaan pengguna',
+}) {
   if (typeof fetch !== 'function') {
     throw new Error('Runtime Node belum mendukung fetch.');
   }
@@ -173,7 +470,7 @@ async function callGemini({ apiKey, model, message, history, context }) {
         signal: controller.signal,
         body: JSON.stringify({
           systemInstruction: {
-            parts: [{ text: SYSTEM_PROMPT.trim() }],
+            parts: [{ text: systemPrompt.trim() }],
           },
           contents: [
             ...normalizeHistory(history),
@@ -181,7 +478,7 @@ async function callGemini({ apiKey, model, message, history, context }) {
               role: 'user',
               parts: [
                 {
-                  text: `${context}\n\nPertanyaan petani:\n${message}`,
+                  text: `${context}\n\n${questionLabel}:\n${message}`,
                 },
               ],
             },
@@ -215,13 +512,14 @@ async function callGemini({ apiKey, model, message, history, context }) {
 }
 
 router.use(protect);
-router.use(authorize('petani'));
+router.use(authorize('petani', 'pengurus'));
 
 router.post('/chat', async (req, res) => {
   const message = String(req.body?.message || '').trim();
   const history = req.body?.history || [];
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const role = req.user?.role;
 
   if (!message) {
     return res.status(400).json({ message: 'Pertanyaan wajib diisi.' });
@@ -240,13 +538,18 @@ router.post('/chat', async (req, res) => {
   }
 
   try {
-    const context = await getAgricultureContext(req.user.id);
+    const isPengurus = role === 'pengurus';
+    const context = isPengurus
+      ? await getPengurusContext()
+      : await getAgricultureContext(req.user.id);
     const answer = await callGemini({
       apiKey,
       model,
       message,
       history,
       context,
+      systemPrompt: isPengurus ? PENGURUS_SYSTEM_PROMPT : SYSTEM_PROMPT,
+      questionLabel: isPengurus ? 'Pertanyaan pengurus desa' : 'Pertanyaan petani',
     });
 
     return res.json({
