@@ -6,7 +6,7 @@ import agrosyncLogo from '../../assets/Logo_project.jpeg';
 const ROLE_REDIRECTS = {
   petani: '/petani/dashboard',
   pengurus: '/pengurus/dashboard',
-  masyarakat: '/masyarakat/dashboard',
+  masyarakat: '/masyarakat/wisata',
   wisata: '/wisata/dashboard',
 };
 

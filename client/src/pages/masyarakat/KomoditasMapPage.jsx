@@ -57,13 +57,6 @@ const COMMODITY_FILTERS = [
     bg: '#e6f6f2',
     keywords: ['peternakan', 'ternak', 'sapi', 'kambing', 'domba', 'ayam'],
   },
-  {
-    key: 'lainnya',
-    label: 'Lainnya',
-    color: '#94a3b8',
-    bg: '#f1f5f9',
-    keywords: [],
-  },
 ];
 
 const HARVEST_ESTIMATES = {
@@ -174,13 +167,7 @@ function MapIcon({ name, size = 18 }) {
         <path d="M4 9.5h16" />
       </svg>
     ),
-    lainnya: (
-      <svg {...commonProps}>
-        <path d="M5 12h.01" />
-        <path d="M12 12h.01" />
-        <path d="M19 12h.01" />
-      </svg>
-    ),
+
   };
 
   return icons[name] || icons.map;
@@ -191,7 +178,7 @@ function getKomoditasText(item) {
     item.komoditas?.nama_komoditas ||
     item.Komoditas?.nama_komoditas ||
     (Array.isArray(item.commodity) ? item.commodity[0] : null) ||
-    'Lainnya'
+    'Tidak Diketahui'
   );
 }
 
@@ -224,6 +211,7 @@ function getPlaceName(item) {
 function getLocationText(item) {
   return (
     getReadableLocation(
+      item.nama_tempat,
       item.location,
       item.lokasi_lahan,
       item.lokasi?.nama_lokasi,
@@ -396,10 +384,8 @@ function getCommodityConfig(name) {
 
   return (
     COMMODITY_FILTERS.find((item) =>
-      item.key !== 'lainnya'
-        ? item.keywords.some((keyword) => normalizedName.includes(keyword))
-        : false,
-    ) || COMMODITY_FILTERS.find((item) => item.key === 'lainnya')
+      item.keywords.some((keyword) => normalizedName.includes(keyword)),
+    ) || null
   );
 }
 
@@ -470,6 +456,7 @@ function getYearValue(item) {
 
 function getRegionValue(item) {
   const location = getLocationText(item);
+  if (isCoordinateText(location)) return 'Lokasi belum diisi';
   return location.split(',').slice(0, 2).join(',').trim() || location;
 }
 
@@ -501,6 +488,9 @@ function MapFocus({ items, resetKey }) {
 function enrichLahan(item) {
   const commodityName = getKomoditasText(item);
   const commodity = getCommodityConfig(commodityName);
+
+  if (!commodity) return null;
+
   const position = getLahanPosition(item);
   const areaHa = item.area_ha !== undefined ? Number(item.area_ha) : getAreaInHa(item);
   const harvestSeason = getHarvestSeason(item, commodity.key);
@@ -574,12 +564,14 @@ export default function KomoditasMapPage() {
   }, []);
 
   const enrichedLahan = useMemo(() => {
-    return lahan.map(enrichLahan).filter((item) => item.position);
+    return lahan.map(enrichLahan).filter(Boolean);
   }, [lahan]);
 
   const years = useMemo(() => {
-    const values = [...new Set(enrichedLahan.map((item) => item.year).filter(Boolean))];
-    return values.sort((a, b) => Number(b) - Number(a));
+    const fixedYears = ['2026', '2027', '2028'];
+    const dataYears = enrichedLahan.map((item) => item.year).filter(Boolean);
+    const values = [...new Set([...fixedYears, ...dataYears])];
+    return values.sort((a, b) => Number(a) - Number(b));
   }, [enrichedLahan]);
 
   const regions = useMemo(() => {
@@ -667,7 +659,7 @@ export default function KomoditasMapPage() {
               <MapTiles />
               <MapFocus items={filteredLahan} resetKey={resetKey} />
 
-              {filteredLahan.map((item) => (
+              {filteredLahan.filter((item) => item.position).map((item) => (
                 <Fragment key={item.id_lahan}>
                   {item.polygonPoints.length >= 3 && (
                     <Polygon
@@ -831,12 +823,12 @@ export default function KomoditasMapPage() {
           </label>
 
           <label className="komoditas-select-field">
-            <span>Wilayah</span>
+            <span>Lokasi</span>
             <select
               value={selectedRegion}
               onChange={(event) => setSelectedRegion(event.target.value)}
             >
-              <option value="semua">Semua Wilayah</option>
+              <option value="semua">Semua Lokasi</option>
               {regions.map((region) => (
                 <option key={region} value={region}>
                   {region}

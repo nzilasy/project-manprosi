@@ -69,7 +69,7 @@ const FALLBACK_POTENSI = [
     luas: 0.4,
     satuan_luas: 'ha',
     status: 'nonaktif',
-    komoditas: { nama_komoditas: 'Lainnya' },
+    komoditas: { nama_komoditas: 'Tidak Diketahui' },
     latitude: -6.9192,
     longitude: 107.6196,
   },
@@ -169,7 +169,7 @@ function getKomoditasText(item) {
   return (
     item?.komoditas?.nama_komoditas ||
     item?.Komoditas?.nama_komoditas ||
-    'Lainnya'
+    'Tidak Diketahui'
   );
 }
 

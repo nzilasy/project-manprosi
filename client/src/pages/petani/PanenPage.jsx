@@ -24,6 +24,15 @@ const commodityImages = [
 
 const FARM_HARVEST_UNITS = ['ton', 'kg', 'kwintal'];
 const LIVESTOCK_HARVEST_UNITS = ['ekor', 'kg', 'liter', 'butir'];
+const LIVESTOCK_TYPES = [
+  'Sapi',
+  'Kambing',
+  'Domba',
+  'Ayam',
+  'Bebek',
+  'Ikan/Lele',
+  'Lainnya',
+];
 
 function createDefaultForm() {
   const today = new Date();
@@ -33,6 +42,7 @@ function createDefaultForm() {
   return {
     id_lahan: '',
     id_komoditas: '',
+    jenis_ternak: '',
     tanggal_mulai_periode: toInputDate(start),
     tanggal_selesai_periode: toInputDate(today),
     luas_panen: '',
@@ -75,16 +85,26 @@ function formatShortDate(value) {
   }).format(date);
 }
 
+function isCoordinateText(value) {
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+function getReadableValue(...values) {
+  return values.find((v) => v && !isCoordinateText(v));
+}
+
 function getLocationText(item) {
   return (
-    item?.lokasi_lahan ||
-    item?.lokasi?.nama_lokasi ||
-    item?.lokasi?.nama_desa ||
-    item?.lokasi?.alamat ||
-    item?.lokasi?.kecamatan ||
-    item?.lokasi?.kabupaten ||
-    item?.lokasi?.kabupaten_kota ||
-    'Lokasi belum diisi'
+    getReadableValue(
+      item?.nama_tempat,
+      item?.lokasi_lahan,
+      item?.lokasi?.nama_lokasi,
+      item?.lokasi?.nama_desa,
+      item?.lokasi?.alamat,
+      item?.lokasi?.kecamatan,
+      item?.lokasi?.kabupaten,
+      item?.lokasi?.kabupaten_kota,
+    ) || 'Lokasi belum diisi'
   );
 }
 
@@ -333,20 +353,32 @@ export default function PanenPage() {
     new Date().getFullYear();
 
   const handleChange = (field, value) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-      ...(field === 'id_komoditas'
-        ? {
-            satuan: normalizeHarvestUnit(
-              komoditas.find(
-                (item) => String(item.id_komoditas) === String(value),
-              )?.nama_komoditas || getCommodityName(selectedLahan),
-              current.satuan,
-            ),
-          }
-        : {}),
-    }));
+    setForm((current) => {
+      const updates = { [field]: value };
+
+      if (field === 'id_komoditas') {
+        const nextName =
+          komoditas.find(
+            (item) => String(item.id_komoditas) === String(value),
+          )?.nama_komoditas || getCommodityName(selectedLahan);
+
+        updates.satuan = normalizeHarvestUnit(nextName, current.satuan);
+
+        const wasLivestock = isLivestockCommodity(
+          komoditas.find(
+            (item) => String(item.id_komoditas) === String(current.id_komoditas),
+          )?.nama_komoditas || '',
+        );
+        const nowLivestock = isLivestockCommodity(nextName);
+
+        if (wasLivestock !== nowLivestock) {
+          updates.kualitas = nowLivestock ? 'Sehat' : 'Premium';
+          updates.jenis_ternak = nowLivestock ? '' : '';
+        }
+      }
+
+      return { ...current, ...updates };
+    });
   };
 
   const handleLahanChange = (value) => {
@@ -440,6 +472,7 @@ export default function PanenPage() {
       const payload = {
         id_lahan: Number(form.id_lahan),
         id_komoditas: form.id_komoditas ? Number(form.id_komoditas) : null,
+        jenis_ternak: form.jenis_ternak || null,
         tanggal_mulai_periode: form.tanggal_mulai_periode,
         tanggal_selesai_periode: form.tanggal_selesai_periode,
         tanggal_panen: form.tanggal_selesai_periode,
@@ -506,15 +539,12 @@ export default function PanenPage() {
               </label>
 
               <label>
-                <span>Komoditas <b>*</b></span>
+                <span>Komoditas</span>
                 <select
                   value={form.id_komoditas}
-                  onChange={(event) =>
-                    handleChange('id_komoditas', event.target.value)
-                  }
-                  required
+                  disabled
                 >
-                  <option value="">Pilih komoditas</option>
+                  <option value="">Belum ditentukan</option>
                   {komoditas.map((item) => (
                     <option key={item.id_komoditas} value={item.id_komoditas}>
                       {item.nama_komoditas}
@@ -523,8 +553,28 @@ export default function PanenPage() {
                 </select>
               </label>
 
+              {isLivestockSelected && (
+                <label>
+                  <span>Jenis Ternak <b>*</b></span>
+                  <select
+                    value={form.jenis_ternak}
+                    onChange={(event) =>
+                      handleChange('jenis_ternak', event.target.value)
+                    }
+                    required
+                  >
+                    <option value="">Pilih jenis ternak</option>
+                    {LIVESTOCK_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
               <label>
-                <span>Periode Panen <b>*</b></span>
+                <span>{isLivestockSelected ? 'Periode Produksi' : 'Periode Panen'} <b>*</b></span>
                 <div className="panen-period-input">
                   <input
                     type="date"
@@ -547,30 +597,32 @@ export default function PanenPage() {
                 </div>
               </label>
 
-              <label>
-                <span>Luas Panen <b>*</b></span>
-                <div className="panen-addon-input">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.luas_panen}
-                    onChange={(event) =>
-                      handleChange('luas_panen', event.target.value)
-                    }
-                    required
-                  />
-                  <select
-                    value={form.satuan_luas_panen}
-                    onChange={(event) =>
-                      handleChange('satuan_luas_panen', event.target.value)
-                    }
-                  >
-                    <option value="ha">ha</option>
-                    <option value="m2">m2</option>
-                  </select>
-                </div>
-              </label>
+              {!isLivestockSelected && (
+                <label>
+                  <span>Luas Panen <b>*</b></span>
+                  <div className="panen-addon-input">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.luas_panen}
+                      onChange={(event) =>
+                        handleChange('luas_panen', event.target.value)
+                      }
+                      required
+                    />
+                    <select
+                      value={form.satuan_luas_panen}
+                      onChange={(event) =>
+                        handleChange('satuan_luas_panen', event.target.value)
+                      }
+                    >
+                      <option value="ha">ha</option>
+                      <option value="m2">m2</option>
+                    </select>
+                  </div>
+                </label>
+              )}
 
               <label>
                 <span>{harvestLabel} <b>*</b></span>
@@ -596,41 +648,55 @@ export default function PanenPage() {
                 </div>
               </label>
 
-              <label>
-                <span>{productivityLabel}</span>
-                <input
-                  type="text"
-                  value={`${formatNumber(productivity)} ${form.satuan}/ha`}
-                  readOnly
-                />
-              </label>
-
-              <label>
-                <span>Kadar Air (%)</span>
-                <div className="panen-addon-input compact-addon">
+              {!isLivestockSelected && (
+                <label>
+                  <span>{productivityLabel}</span>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.kadar_air}
-                    onChange={(event) =>
-                      handleChange('kadar_air', event.target.value)
-                    }
+                    type="text"
+                    value={`${formatNumber(productivity)} ${form.satuan}/ha`}
+                    readOnly
                   />
-                  <span>%</span>
-                </div>
-              </label>
+                </label>
+              )}
+
+              {!isLivestockSelected && (
+                <label>
+                  <span>Kadar Air (%)</span>
+                  <div className="panen-addon-input compact-addon">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.kadar_air}
+                      onChange={(event) =>
+                        handleChange('kadar_air', event.target.value)
+                      }
+                    />
+                    <span>%</span>
+                  </div>
+                </label>
+              )}
 
               <label>
-                <span>Kualitas</span>
+                <span>{isLivestockSelected ? 'Kondisi' : 'Kualitas'}</span>
                 <select
                   value={form.kualitas}
                   onChange={(event) => handleChange('kualitas', event.target.value)}
                 >
-                  <option value="Premium">Premium</option>
-                  <option value="Baik">Baik</option>
-                  <option value="Sedang">Sedang</option>
-                  <option value="Perlu Sortir">Perlu Sortir</option>
+                  {isLivestockSelected ? (
+                    <>
+                      <option value="Sehat">Sehat</option>
+                      <option value="Cukup Sehat">Cukup Sehat</option>
+                      <option value="Perlu Perawatan">Perlu Perawatan</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Premium">Premium</option>
+                      <option value="Baik">Baik</option>
+                      <option value="Sedang">Sedang</option>
+                      <option value="Perlu Sortir">Perlu Sortir</option>
+                    </>
+                  )}
                 </select>
               </label>
 
@@ -774,30 +840,37 @@ export default function PanenPage() {
 
           <article className="panen-summary-card">
             <h2>
-              Ringkasan Panen <span>{periodLabel}</span>
+              {isLivestockSelected ? 'Ringkasan Produksi' : 'Ringkasan Panen'}{' '}
+              <span>{periodLabel}</span>
             </h2>
 
             <div className="panen-metric-grid">
-              <MetricCard
-                icon="area"
-                label="Luas Panen"
-                value={`${form.luas_panen || '0'} ${form.satuan_luas_panen}`}
-              />
+              {!isLivestockSelected && (
+                <MetricCard
+                  icon="area"
+                  label="Luas Panen"
+                  value={`${form.luas_panen || '0'} ${form.satuan_luas_panen}`}
+                />
+              )}
               <MetricCard
                 icon="harvest"
                 label={harvestLabel}
                 value={`${form.jumlah || '0'} ${form.satuan}`}
               />
-              <MetricCard
-                icon="chart"
-                label={productivityLabel}
-                value={`${formatNumber(productivity)} ${form.satuan}/ha`}
-              />
-              <MetricCard
-                icon="water"
-                label="Rata-rata Kadar Air"
-                value={`${form.kadar_air || '0'}%`}
-              />
+              {!isLivestockSelected && (
+                <MetricCard
+                  icon="chart"
+                  label={productivityLabel}
+                  value={`${formatNumber(productivity)} ${form.satuan}/ha`}
+                />
+              )}
+              {!isLivestockSelected && (
+                <MetricCard
+                  icon="water"
+                  label="Rata-rata Kadar Air"
+                  value={`${form.kadar_air || '0'}%`}
+                />
+              )}
             </div>
           </article>
 
@@ -848,6 +921,7 @@ export default function PanenPage() {
                   <div>
                     <strong>
                       {historyLahan?.nama_lahan || 'Lahan'} - {historyKomoditas}
+                      {item.jenis_ternak ? ` (${item.jenis_ternak})` : ''}
                     </strong>
                     <p>
                       {formatShortDate(item.tanggal_mulai_periode)} -{' '}

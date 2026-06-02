@@ -54,7 +54,6 @@ const navByRole = {
     {
       group: 'INFORMASI DESA',
       items: [
-        { to: '/masyarakat/dashboard', label: 'Beranda', icon: 'home' },
         { to: '/masyarakat/wisata', label: 'Peta Wisata', icon: 'map' },
         { to: '/masyarakat/komoditas', label: 'Peta Komoditas', icon: 'file-search' },
       ],
