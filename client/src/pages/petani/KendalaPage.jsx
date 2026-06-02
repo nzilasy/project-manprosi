@@ -68,16 +68,26 @@ function formatShortDate(value) {
   }).format(date);
 }
 
+function isCoordinateText(value) {
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+function getReadableValue(...values) {
+  return values.find((v) => v && !isCoordinateText(v));
+}
+
 function getLocationText(item) {
   return (
-    item?.lokasi_lahan ||
-    item?.lokasi?.nama_lokasi ||
-    item?.lokasi?.nama_desa ||
-    item?.lokasi?.alamat ||
-    item?.lokasi?.kecamatan ||
-    item?.lokasi?.kabupaten ||
-    item?.lokasi?.kabupaten_kota ||
-    'Lokasi belum diisi'
+    getReadableValue(
+      item?.nama_tempat,
+      item?.lokasi_lahan,
+      item?.lokasi?.nama_lokasi,
+      item?.lokasi?.nama_desa,
+      item?.lokasi?.alamat,
+      item?.lokasi?.kecamatan,
+      item?.lokasi?.kabupaten,
+      item?.lokasi?.kabupaten_kota,
+    ) || 'Lokasi belum diisi'
   );
 }
 

@@ -51,12 +51,6 @@ const COMMODITY_CONFIG = [
     color: '#0f766e',
     keywords: ['peternakan', 'ternak', 'sapi', 'kambing', 'domba', 'ayam'],
   },
-  {
-    key: 'lainnya',
-    label: 'Lainnya',
-    color: '#94a3b8',
-    keywords: [],
-  },
 ];
 
 const FALLBACK_REPORTS = [
@@ -199,23 +193,33 @@ function getKomoditasText(item) {
     item?.komoditas?.nama_komoditas ||
     item?.Komoditas?.nama_komoditas ||
     item?.commodity?.[0] ||
-    'Lainnya'
+    'Tidak Diketahui'
   );
+}
+
+function isCoordinateText(value) {
+  return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
+}
+
+function getReadableValue(...values) {
+  return values.find((v) => v && !isCoordinateText(v));
 }
 
 function getLocationText(item) {
   const lokasi = item?.lokasi || item?.Lokasi || {};
 
   return (
-    item?.lokasi_lahan ||
-    lokasi.nama_lokasi ||
-    lokasi.nama_desa ||
-    lokasi.desa_kelurahan ||
-    lokasi.alamat ||
-    lokasi.kecamatan ||
-    lokasi.kabupaten ||
-    lokasi.kabupaten_kota ||
-    'Lokasi belum diisi'
+    getReadableValue(
+      item?.nama_tempat,
+      item?.lokasi_lahan,
+      lokasi.nama_lokasi,
+      lokasi.nama_desa,
+      lokasi.desa_kelurahan,
+      lokasi.alamat,
+      lokasi.kecamatan,
+      lokasi.kabupaten,
+      lokasi.kabupaten_kota,
+    ) || 'Lokasi belum diisi'
   );
 }
 
@@ -312,15 +316,14 @@ function getCommodityConfig(name) {
 
   return (
     COMMODITY_CONFIG.find((item) =>
-      item.key !== 'lainnya'
-        ? item.keywords.some((keyword) => normalized.includes(keyword))
-        : false,
-    ) || COMMODITY_CONFIG.find((item) => item.key === 'lainnya')
+      item.keywords.some((keyword) => normalized.includes(keyword)),
+    ) || null
   );
 }
 
 function getRegionValue(item) {
   const location = getLocationText(item);
+  if (isCoordinateText(location)) return 'Lokasi belum diisi';
   return location.split(',').slice(0, 2).join(',').trim() || location;
 }
 
@@ -393,6 +396,8 @@ function MapFocus({ items }) {
 function enrichLahan(item) {
   const commodityName = getKomoditasText(item);
   const commodity = getCommodityConfig(commodityName);
+
+  if (!commodity) return null;
 
   return {
     ...item,
@@ -493,15 +498,13 @@ export default function PengurusDashboard() {
     };
   }, []);
 
-  const enrichedLahan = useMemo(() => lahan.map(enrichLahan), [lahan]);
+  const enrichedLahan = useMemo(() => lahan.map(enrichLahan).filter(Boolean), [lahan]);
   const hasLiveLahan = enrichedLahan.length > 0;
 
   const commodityOptions = useMemo(() => {
     const keys = new Set(enrichedLahan.map((item) => item.commodityKey));
 
-    return COMMODITY_CONFIG.filter(
-      (item) => item.key !== 'lainnya' || keys.has('lainnya'),
-    ).filter((item) => keys.has(item.key));
+    return COMMODITY_CONFIG.filter((item) => keys.has(item.key));
   }, [enrichedLahan]);
 
   const regionOptions = useMemo(() => {
@@ -617,12 +620,12 @@ export default function PengurusDashboard() {
             </label>
 
             <label>
-              <span>Pilih Dusun</span>
+              <span>Lokasi</span>
               <select
                 value={selectedRegion}
                 onChange={(event) => setSelectedRegion(event.target.value)}
               >
-                <option value="semua">Semua Dusun</option>
+                <option value="semua">Semua Lokasi</option>
                 {regionOptions.map((item) => (
                   <option key={item} value={item}>
                     {item}

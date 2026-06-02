@@ -1,827 +1,95 @@
 import { useEffect, useMemo, useState } from 'react';
-import L from 'leaflet';
-import {
-  MapContainer,
-  Marker,
-  Popup,
-  TileLayer,
-  useMap,
-  useMapEvents,
-} from 'react-leaflet';
+import { komoditasService } from '../../services/komoditasService';
 import { lahanService } from '../../services/lahanService';
 import './LahanTidakTermanfaatkanPage.css';
-
-const DEFAULT_CENTER = [-6.9175, 107.6191];
-const DEFAULT_ZOOM = 18;
-const MAX_ZOOM = 20;
-const SELECTED_MAP_ZOOM = MAX_ZOOM;
-const MAX_NATIVE_TILE_ZOOM = 18;
-const ESRI_ATTRIBUTION =
-  'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
-const MAP_SOURCE_TEXT = 'Sumber peta: Esri World Imagery.';
-const INDONESIA_BOUNDS = [
-  [-11.2, 94.5],
-  [6.5, 141.5],
-];
-
-const INITIAL_FORM = {
-  nama_lahan: '',
-  nama_lokasi: '',
-  nama_patokan: '',
-  koordinat_lahan: '',
-  luas: '',
-  satuan_luas: 'm2',
-  deskripsi: '',
-};
-
-const markerIcon = new L.Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-function formatDate(value) {
-  if (!value) return '-';
-
-  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return new Intl.DateTimeFormat('id-ID', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-}
-
-function formatNumber(value) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 2,
-  }).format(Number(value) || 0);
-}
-
-function getCoordinateLabel(position) {
-  if (!position) return '';
-  return `${position[0].toFixed(6)}, ${position[1].toFixed(6)}`;
-}
 
 function isCoordinateText(value) {
   return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(String(value || '').trim());
 }
 
-function getReportReference(item) {
-  const reference = String(item.nama_tempat || '').trim();
-  const name = String(item.nama_lahan || '').trim();
-  const location = String(item.lokasi_lahan || '').trim();
-
-  if (!reference || reference === name || reference === location) {
-    return '';
-  }
-
-  return reference;
+function getReadableLocation(...values) {
+  return values.find((v) => v && !isCoordinateText(v)) || 'Lokasi belum diisi';
 }
 
-function getReportLocation(item) {
-  const location = String(item.lokasi_lahan || '').trim();
-  const reference = getReportReference(item);
-
-  if (location && !isCoordinateText(location)) {
-    return location;
-  }
-
-  if (reference) {
-    return reference;
-  }
-
-  if (location) {
-    return 'Titik koordinat tersimpan';
-  }
-
-  return 'Lokasi belum diisi';
+function getLocationText(item) {
+  const lokasi = item.lokasi || item.Lokasi || {};
+  return getReadableLocation(
+    item.nama_tempat,
+    item.lokasi_lahan,
+    lokasi.nama_lokasi,
+    lokasi.nama_desa,
+    lokasi.desa_kelurahan,
+    lokasi.alamat,
+    lokasi.kecamatan,
+    lokasi.kabupaten,
+    lokasi.kabupaten_kota,
+  );
 }
 
-function getAreaText(item) {
-  const luas = Number(item.luas || 0);
-  const satuan = item.satuan_luas || 'm2';
-
-  return `${formatNumber(luas)} ${satuan}`;
-}
-
-function getReportPosition(item) {
-  const lat = Number(item.latitude);
-  const lng = Number(item.longitude);
-
-  if (Number.isNaN(lat) || Number.isNaN(lng)) {
-    return null;
-  }
-
-  return [lat, lng];
-}
-
-function SatelliteTiles() {
+function getCommodityName(item) {
   return (
-    <>
-      <TileLayer
-        attribution={ESRI_ATTRIBUTION}
-        maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
-        maxZoom={MAX_ZOOM}
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      />
-      <TileLayer
-        attribution="Labels &copy; OpenStreetMap contributors &copy; CARTO"
-        maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
-        maxZoom={MAX_ZOOM}
-        subdomains={['a', 'b', 'c', 'd']}
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
-      />
-    </>
+    item?.komoditas?.nama_komoditas ||
+    item?.Komoditas?.nama_komoditas ||
+    'Belum ditentukan'
   );
 }
 
-function isUnusedLand(item) {
-  const status = String(item.status || '').toLowerCase();
-  const komoditas = item.komoditas || item.Komoditas;
-
-  return (
-    status.includes('non') ||
-    status.includes('belum') ||
-    status.includes('tidak') ||
-    !komoditas
-  );
+function getOwnerName(item) {
+  return item?.user?.name || item?.User?.name || 'Tidak diketahui';
 }
 
-function isMapUiClick(event) {
-  const target = event.originalEvent?.target;
-
-  return Boolean(
-    target?.closest?.(
-      '.leaflet-popup, .leaflet-control, .unused-map-filter, .unused-map-tools',
-    ),
-  );
+function getOwnerEmail(item) {
+  return item?.user?.email || item?.User?.email || '-';
 }
 
-function MapClickHandler({ onPick }) {
-  useMapEvents({
-    click(event) {
-      if (isMapUiClick(event)) {
-        return;
-      }
-
-      onPick([event.latlng.lat, event.latlng.lng]);
-    },
-  });
-
-  return null;
+function getOwnerPhone(item) {
+  return item?.user?.phone || item?.User?.phone || '-';
 }
 
-function MapFocus({ focusPosition }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (focusPosition) {
-      map.flyTo(focusPosition, SELECTED_MAP_ZOOM, {
-        duration: 0.8,
-      });
-    }
-  }, [map, focusPosition]);
-
-  return null;
+function getAreaInHa(item) {
+  const luas = Number(item?.luas || 0);
+  const satuan = String(item?.satuan_luas || 'ha').toLowerCase();
+  return satuan === 'm2' || satuan === 'm²' ? luas / 10000 : luas;
 }
 
-function MapResizeWatcher() {
-  const map = useMap();
-
-  useEffect(() => {
-    const container = map.getContainer();
-    const resizeMap = () => map.invalidateSize();
-
-    resizeMap();
-    requestAnimationFrame(resizeMap);
-
-    if (typeof ResizeObserver === 'undefined') {
-      return undefined;
-    }
-
-    const observer = new ResizeObserver(resizeMap);
-    observer.observe(container);
-
-    return () => observer.disconnect();
-  }, [map]);
-
-  return null;
+function formatNumber(value, opts = {}) {
+  return new Intl.NumberFormat('id-ID', opts).format(Number(value) || 0);
 }
 
-export default function LahanTidakTermanfaatkanPage() {
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [position, setPosition] = useState(null);
-  const [mapFocusPosition, setMapFocusPosition] = useState(null);
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [searchingPatokan, setSearchingPatokan] = useState(false);
-  const [patokanResults, setPatokanResults] = useState([]);
-  const [patokanSearchStatus, setPatokanSearchStatus] = useState('idle');
-  const [selectedPatokanName, setSelectedPatokanName] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-
-  const reportMarkers = useMemo(() => {
-    return reports
-      .map((item) => ({
-        item,
-        position: getReportPosition(item),
-      }))
-      .filter((marker) => marker.position);
-  }, [reports]);
-
-  const latestReports = useMemo(() => {
-    if (reports.length === 0) {
-      return [
-        {
-          id_lahan: 'fallback-1',
-          nama_lahan: 'Lahan Kosong Dekat Sungai',
-          lokasi_lahan: 'Sukapura',
-          luas: 1250,
-          satuan_luas: 'm2',
-          created_at: '2024-05-20',
-          statusLabel: 'Menunggu',
-        },
-        {
-          id_lahan: 'fallback-2',
-          nama_lahan: 'Lahan Terbengkalai',
-          lokasi_lahan: 'Baleendah',
-          luas: 2100,
-          satuan_luas: 'm2',
-          created_at: '2024-03-15',
-          statusLabel: 'Diproses',
-        },
-      ];
-    }
-
-    return reports.slice(0, 2).map((item, index) => ({
-      ...item,
-      statusLabel: index === 0 ? 'Menunggu' : 'Diproses',
-    }));
-  }, [reports]);
-
-  const loadReports = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const { data } = await lahanService.getAll();
-      const rows = Array.isArray(data.data) ? data.data : [];
-
-      setReports(rows.filter(isUnusedLand));
-    } catch (err) {
-      setError(err.response?.data?.message || 'Gagal memuat laporan lahan.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadReports();
-  }, []);
-
-  const handleChange = (field, value) => {
-    if (field === 'nama_patokan') {
-      setPatokanResults([]);
-      setPatokanSearchStatus('idle');
-      setSelectedPatokanName('');
-    }
-
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
-
-  const handlePickLocation = (nextPosition) => {
-    setPosition(nextPosition);
-    setMapFocusPosition(null);
-    setForm((current) => ({
-      ...current,
-      koordinat_lahan: getCoordinateLabel(nextPosition),
-    }));
-  };
-
-  const handleClearSelectedLocation = () => {
-    setPosition(null);
-    setMapFocusPosition(null);
-    setForm((current) => ({
-      ...current,
-      koordinat_lahan: '',
-    }));
-    setMessage('Titik lokasi yang ditandai sudah dibatalkan.');
-    setError('');
-  };
-
-  const resetForm = (clearFeedback = true) => {
-    setForm(INITIAL_FORM);
-    setPosition(null);
-    setMapFocusPosition(null);
-    setPatokanResults([]);
-    setPatokanSearchStatus('idle');
-    setSelectedPatokanName('');
-    if (clearFeedback) {
-      setMessage('');
-      setError('');
-    }
-  };
-
-  const searchPatokan = async (keyword, { signal, showFeedback = false } = {}) => {
-    try {
-      const params = new URLSearchParams({
-        format: 'json',
-        addressdetails: '1',
-        countrycodes: 'id',
-        limit: '5',
-        q: keyword,
-      });
-
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-        {
-          signal,
-          headers: {
-            Accept: 'application/json',
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error('Search request failed');
-      }
-
-      const results = await response.json();
-      const normalizedResults = results
-        .map((item) => ({
-          id: item.place_id,
-          name: item.display_name,
-          lat: Number(item.lat),
-          lng: Number(item.lon),
-        }))
-        .filter((item) => (
-          item.id &&
-          item.name &&
-          !Number.isNaN(item.lat) &&
-          !Number.isNaN(item.lng)
-        ));
-
-      if (normalizedResults.length === 0) {
-        setPatokanResults([]);
-        setPatokanSearchStatus('empty');
-        if (showFeedback) {
-          setError('Patokan tidak ditemukan. Coba gunakan nama tempat yang lebih spesifik.');
-        }
-        return;
-      }
-
-      setPatokanResults(normalizedResults);
-      setPatokanSearchStatus('ready');
-      if (showFeedback) {
-        setMessage('Pilih salah satu hasil pencarian untuk mengarahkan peta.');
-      }
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        return;
-      }
-
-      setPatokanResults([]);
-      setPatokanSearchStatus('error');
-      if (showFeedback) {
-        setError('Gagal mencari patokan. Periksa koneksi internet lalu coba lagi.');
-      }
-    }
-  };
-
-  const handleSearchPatokan = async () => {
-    const namaPatokan = form.nama_patokan.trim();
-    const namaLokasi = form.nama_lokasi.trim();
-    const keyword = [namaPatokan, namaLokasi].filter(Boolean).join(', ');
-
-    setMessage('');
-    setError('');
-    setPatokanResults([]);
-
-    if (keyword.length < 3) {
-      setError('Isi nama patokan atau nama lokasi minimal 3 karakter untuk diarahkan ke peta.');
-      return;
-    }
-
-    setSearchingPatokan(true);
-    setPatokanSearchStatus('searching');
-
-    await searchPatokan(keyword, { showFeedback: true });
-
-    setSearchingPatokan(false);
-  };
-
-  const handleSelectPatokan = (result) => {
-    const nextPosition = [result.lat, result.lng];
-    const shortLocation = String(result.name || '')
-      .split(',')
-      .slice(0, 4)
-      .join(',')
-      .trim();
-    const placeName = String(result.name || '').split(',')[0]?.trim() || shortLocation;
-
-    setPosition(nextPosition);
-    setMapFocusPosition(nextPosition);
-    setPatokanResults([]);
-    setPatokanSearchStatus('selected');
-    setSelectedPatokanName(placeName);
-    setForm((current) => ({
-      ...current,
-      nama_patokan: placeName,
-      nama_lokasi: current.nama_lokasi || shortLocation,
-      koordinat_lahan: getCoordinateLabel(nextPosition),
-    }));
-    setMessage('Patokan dipilih. Peta diarahkan ke lokasi tersebut.');
-  };
-
-  useEffect(() => {
-    const namaPatokan = form.nama_patokan.trim();
-    const namaLokasi = form.nama_lokasi.trim();
-
-    if (!namaPatokan || namaPatokan === selectedPatokanName) {
-      return undefined;
-    }
-
-    if (namaPatokan.length < 3) {
-      setPatokanResults([]);
-      setPatokanSearchStatus('idle');
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    const keyword = [namaPatokan, namaLokasi].filter(Boolean).join(', ');
-
-    setPatokanSearchStatus('searching');
-
-    const timeoutId = window.setTimeout(() => {
-      searchPatokan(keyword, { signal: controller.signal });
-    }, 450);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [form.nama_patokan, form.nama_lokasi, selectedPatokanName]);
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setMessage('');
-    setError('');
-
-    if (!position) {
-      setSubmitting(false);
-      setError('Pilih titik lokasi lahan pada peta terlebih dahulu.');
-      return;
-    }
-
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      const namaLokasi = form.nama_lokasi.trim();
-      const namaPatokan = form.nama_patokan.trim();
-      const catatan = [
-        'Laporan lahan tidak termanfaatkan',
-        namaPatokan ? `Patokan lokasi: ${namaPatokan}` : null,
-        form.deskripsi ? `Deskripsi: ${form.deskripsi}` : null,
-      ]
-        .filter(Boolean)
-        .join('\n');
-      const payload = {
-        nama_lahan: form.nama_lahan,
-        nama_tempat: namaPatokan || namaLokasi || form.nama_lahan,
-        lokasi_lahan: namaLokasi,
-        luas: Number(form.luas || 0),
-        satuan_luas: form.satuan_luas,
-        latitude: position[0],
-        longitude: position[1],
-        tanggal_tanam_terakhir: today,
-        status: 'nonaktif',
-        deskripsi: form.deskripsi,
-        catatan,
-      };
-
-      await lahanService.create(payload);
-      resetForm(false);
-      setMessage('Laporan lahan berhasil disimpan.');
-      await loadReports();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan laporan lahan.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="unused-page">
-      <header className="unused-header">
-        <h1>Lahan Tidak Termanfaatkan</h1>
-        <p>
-          Laporkan lahan yang belum dimanfaatkan dengan baik agar dapat ditindaklanjuti.
-        </p>
-      </header>
-
-      {message && <div className="unused-message is-success">{message}</div>}
-      {error && <div className="unused-message is-error">{error}</div>}
-
-      <section className="unused-layout">
-        <form className="unused-form-card" onSubmit={handleSubmit}>
-          <div className="unused-card-heading">
-            <div>
-              <h2>Form Laporan Lahan</h2>
-              <p>Lengkapi informasi lahan, lalu pilih titik lokasi pada peta di bawah form.</p>
-            </div>
-          </div>
-
-          <div className="unused-form-grid">
-            <label className="unused-field">
-              <span>Nama Lahan</span>
-              <input
-                type="text"
-                value={form.nama_lahan}
-                onChange={(event) => handleChange('nama_lahan', event.target.value)}
-                placeholder="Contoh: Lahan kosong dekat sungai"
-                required
-              />
-            </label>
-
-            <label className="unused-field">
-              <span>Luas Lahan</span>
-              <div className="unused-unit-input">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.luas}
-                  onChange={(event) => handleChange('luas', event.target.value)}
-                  placeholder="Masukkan luas lahan"
-                  required
-                />
-                <select
-                  value={form.satuan_luas}
-                  onChange={(event) => handleChange('satuan_luas', event.target.value)}
-                  aria-label="Satuan luas lahan"
-                >
-                  <option value="m2">m2</option>
-                  <option value="ha">ha</option>
-                  <option value="are">are</option>
-                </select>
-              </div>
-            </label>
-
-            <label className="unused-field">
-              <span>Nama Lokasi</span>
-              <div className="unused-location-input">
-                <input
-                  type="text"
-                  value={form.nama_lokasi}
-                  onChange={(event) => handleChange('nama_lokasi', event.target.value)}
-                  placeholder="Contoh: Dusun Sukamaju, Desa Cibiru"
-                  required
-                />
-                <span aria-hidden="true">
-                  <UnusedIcon name="pin" />
-                </span>
-              </div>
-            </label>
-
-            <label className="unused-field">
-              <span>Nama Patokan</span>
-              <div className="unused-search-wrap">
-                <div className="unused-search-input">
-                  <input
-                    type="text"
-                    value={form.nama_patokan}
-                    onChange={(event) => handleChange('nama_patokan', event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        handleSearchPatokan();
-                      }
-                    }}
-                    placeholder="Contoh: Bogor, balai desa, atau jalan utama"
-                  />
-                  <button type="button" onClick={handleSearchPatokan} disabled={searchingPatokan}>
-                    {searchingPatokan ? 'Mencari...' : 'Cari'}
-                  </button>
-                </div>
-                {patokanResults.length > 0 && (
-                  <div className="unused-search-results">
-                    {patokanResults.map((result) => (
-                      <button
-                        type="button"
-                        key={result.id}
-                        onClick={() => handleSelectPatokan(result)}
-                      >
-                        {result.name.split(',').slice(0, 3).join(', ')}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {patokanResults.length === 0 && patokanSearchStatus === 'searching' && (
-                  <div className="unused-search-results is-status">
-                    <span>Mencari patokan...</span>
-                  </div>
-                )}
-                {patokanResults.length === 0 && patokanSearchStatus === 'empty' && (
-                  <div className="unused-search-results is-status">
-                    <span>Patokan tidak ditemukan.</span>
-                  </div>
-                )}
-              </div>
-            </label>
-
-            <label className="unused-field unused-field-wide">
-              <span>Koordinat Titik Lahan</span>
-              <div className="unused-location-input">
-                <input
-                  type="text"
-                  value={form.koordinat_lahan}
-                  placeholder="Klik lokasi lahan pada peta di bawah"
-                  readOnly
-                  required
-                />
-                <span aria-hidden="true">
-                  <UnusedIcon name="pin" />
-                </span>
-              </div>
-            </label>
-
-            <label className="unused-field unused-field-wide">
-              <span>Deskripsi Lahan</span>
-              <textarea
-                value={form.deskripsi}
-                onChange={(event) => handleChange('deskripsi', event.target.value)}
-                placeholder="Tuliskan deskripsi lengkap mengenai kondisi, akses, atau kendala pada lahan."
-                rows={4}
-              />
-            </label>
-
-            <div className="unused-field unused-field-wide">
-              <span>Foto Lahan (Opsional)</span>
-              <label className="unused-upload">
-                <input type="file" accept="image/*" />
-                <UnusedIcon name="upload" />
-                <strong>Klik untuk mengunggah foto</strong>
-                <small>PNG, JPG maksimal 5MB</small>
-              </label>
-            </div>
-          </div>
-
-          <div className="unused-actions">
-            <button type="button" className="unused-secondary" onClick={() => resetForm()}>
-              Reset
-            </button>
-            <button type="submit" className="unused-primary" disabled={submitting}>
-              {submitting ? 'Menyimpan...' : 'Simpan Laporan'}
-            </button>
-          </div>
-        </form>
-
-        <div className="unused-side">
-          <div className="unused-map-card">
-            <div className="unused-map-filter">
-              <span className="unused-filter-icon">
-                <UnusedIcon name="map" />
-              </span>
-              <select value="lahan-tidak-termanfaatkan" disabled>
-                <option value="lahan-tidak-termanfaatkan">
-                  Lahan Tidak Termanfaatkan
-                </option>
-              </select>
-            </div>
-
-            {position && (
-              <div className="unused-map-tools">
-                <button
-                  type="button"
-                  className="unused-clear-location"
-                  onClick={handleClearSelectedLocation}
-                >
-                  Batalkan Titik
-                </button>
-              </div>
-            )}
-
-            <MapContainer
-              center={DEFAULT_CENTER}
-              className="unused-map"
-              maxBounds={INDONESIA_BOUNDS}
-              maxBoundsViscosity={0.85}
-              maxZoom={MAX_ZOOM}
-              minZoom={5}
-              scrollWheelZoom
-              zoom={DEFAULT_ZOOM}
-            >
-              <SatelliteTiles />
-              <MapClickHandler onPick={handlePickLocation} />
-              <MapFocus focusPosition={mapFocusPosition} />
-              <MapResizeWatcher />
-              {reportMarkers.map((marker) => (
-                <Marker
-                  icon={markerIcon}
-                  key={marker.item.id_lahan}
-                  position={marker.position}
-                  title={marker.item.nama_lahan}
-                >
-                  <Popup>
-                    <div className="unused-map-popup">
-                      <strong>{marker.item.nama_lahan}</strong>
-                      <span>{getReportLocation(marker.item)}</span>
-                      {getReportReference(marker.item) && (
-                        <span>Patokan: {getReportReference(marker.item)}</span>
-                      )}
-                      <small>Luas: {getAreaText(marker.item)}</small>
-                      <small>Dilaporkan: {formatDate(marker.item.created_at)}</small>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-              {position && (
-                <Marker icon={markerIcon} position={position}>
-                  <Popup>
-                    <div className="unused-map-popup">
-                      <strong>Lokasi yang ditandai</strong>
-                      <span>{getCoordinateLabel(position)}</span>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          handleClearSelectedLocation();
-                        }}
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                        }}
-                      >
-                        Batalkan titik ini
-                      </button>
-                    </div>
-                  </Popup>
-                </Marker>
-              )}
-            </MapContainer>
-            <small>{MAP_SOURCE_TEXT} Klik peta untuk memilih lokasi lahan.</small>
-          </div>
-
-          <div className="unused-latest-card">
-            <div className="unused-latest-heading">
-              <h2>Laporan Terbaru</h2>
-              <button type="button">Lihat Semua</button>
-            </div>
-
-            <div className="unused-latest-list">
-              {loading ? (
-                <div className="unused-loading">Memuat laporan...</div>
-              ) : (
-                latestReports.map((item) => (
-                  <article className="unused-report-item" key={item.id_lahan}>
-                    <div className="unused-report-thumb" />
-                    <div>
-                      <strong>{item.nama_lahan}</strong>
-                      <span>{getReportLocation(item)}</span>
-                      {getReportReference(item) && (
-                        <span className="unused-report-reference">
-                          Patokan: {getReportReference(item)}
-                        </span>
-                      )}
-                      <small>
-                        Dilaporkan: {formatDate(item.created_at)} | {getAreaText(item)}
-                      </small>
-                    </div>
-                    <em
-                      className={
-                        item.statusLabel === 'Menunggu'
-                          ? 'unused-status is-waiting'
-                          : 'unused-status is-process'
-                      }
-                    >
-                      {item.statusLabel}
-                    </em>
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+function formatArea(value) {
+  return formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 }
 
-function UnusedIcon({ name }) {
-  const props = {
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+}
+
+function getTimeSince(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  const diff = Date.now() - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Hari ini';
+  if (days === 1) return '1 hari lalu';
+  if (days < 7) return `${days} hari lalu`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks} minggu lalu`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} bulan lalu`;
+  const years = Math.floor(days / 365);
+  return `${years} tahun lalu`;
+}
+
+function LTTIcon({ name }) {
+  const common = {
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
@@ -832,27 +100,416 @@ function UnusedIcon({ name }) {
   };
 
   const icons = {
-    map: (
-      <svg {...props}>
-        <path d="m3 6 5-2 8 3 5-2v13l-5 2-8-3-5 2V6Z" />
+    land: (
+      <svg {...common}>
+        <path d="M3 6l5-2 8 3 5-2v13l-5 2-8-3-5 2V6Z" />
         <path d="M8 4v13" />
         <path d="M16 7v13" />
       </svg>
     ),
-    pin: (
-      <svg {...props}>
-        <path d="M12 21s6-5.2 6-11a6 6 0 0 0-12 0c0 5.8 6 11 6 11Z" />
-        <circle cx="12" cy="10" r="2" />
+    area: (
+      <svg {...common}>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 9h18" />
+        <path d="M9 3v18" />
       </svg>
     ),
-    upload: (
-      <svg {...props}>
-        <path d="M12 16V4" />
-        <path d="m7 9 5-5 5 5" />
-        <path d="M5 20h14" />
+    crop: (
+      <svg {...common}>
+        <path d="M7 20h10" />
+        <path d="M12 20v-8" />
+        <path d="M12 12C12 8 8 4 4 4c0 4 4 8 8 8Z" />
+        <path d="M12 12c0-4 4-8 8-8-4 0-8 4-8 8Z" />
+      </svg>
+    ),
+    user: (
+      <svg {...common}>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+      </svg>
+    ),
+    search: (
+      <svg {...common}>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m21 21-4.35-4.35" />
+      </svg>
+    ),
+    clock: (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 6v6l4 2" />
+      </svg>
+    ),
+    pin: (
+      <svg {...common}>
+        <path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Z" />
+        <circle cx="12" cy="9" r="2.5" />
+      </svg>
+    ),
+    close: (
+      <svg {...common}>
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </svg>
+    ),
+    mail: (
+      <svg {...common}>
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <path d="m22 4-10 8L2 4" />
+      </svg>
+    ),
+    phone: (
+      <svg {...common}>
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 2.07 4.18 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72c.13.81.36 1.6.68 2.34a2 2 0 0 1-.45 2.11L8.09 9.31a16 16 0 0 0 6.6 6.6l1.14-1.14a2 2 0 0 1 2.11-.45c.74.32 1.53.55 2.34.68A2 2 0 0 1 22 16.92Z" />
+      </svg>
+    ),
+    calendar: (
+      <svg {...common}>
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4" />
+        <path d="M8 2v4" />
+        <path d="M3 10h18" />
+      </svg>
+    ),
+    info: (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 16v-4" />
+        <path d="M12 8h.01" />
       </svg>
     ),
   };
 
-  return icons[name] || icons.pin;
+  return icons[name] || null;
+}
+
+function DetailField({ icon, label, value }) {
+  return (
+    <div className="ltt-detail-field">
+      <span className="ltt-detail-field-icon">
+        <LTTIcon name={icon} />
+      </span>
+      <div>
+        <span>{label}</span>
+        <strong>{value || '-'}</strong>
+      </div>
+    </div>
+  );
+}
+
+export default function LahanTidakTermanfaatkanPage() {
+  const [lahanList, setLahanList] = useState([]);
+  const [allCommodities, setAllCommodities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [filterCommodity, setFilterCommodity] = useState('semua');
+  const [filterLocation, setFilterLocation] = useState('semua');
+  const [selectedId, setSelectedId] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      setLoading(true);
+      setError('');
+
+      try {
+        const [lahanRes, komoditasRes] = await Promise.allSettled([
+          lahanService.getInactive(),
+          komoditasService.getAll(),
+        ]);
+
+        if (!active) return;
+
+        if (lahanRes.status === 'fulfilled') {
+          const lahanData = lahanRes.value?.data?.data;
+          setLahanList(Array.isArray(lahanData) ? lahanData : []);
+        } else {
+          setError('Gagal mengambil data lahan nonaktif.');
+        }
+
+        if (komoditasRes.status === 'fulfilled') {
+          const komData = komoditasRes.value?.data?.data || komoditasRes.value?.data;
+          setAllCommodities(Array.isArray(komData) ? komData : []);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { active = false; };
+  }, []);
+
+  const enrichedList = useMemo(() => {
+    return lahanList.map((item) => ({
+      ...item,
+      locationText: getLocationText(item),
+      commodityName: getCommodityName(item),
+      ownerName: getOwnerName(item),
+      ownerEmail: getOwnerEmail(item),
+      ownerPhone: getOwnerPhone(item),
+      areaHa: getAreaInHa(item),
+      areaLabel: `${formatArea(getAreaInHa(item))} ha`,
+      inactiveSince: getTimeSince(item.updated_at),
+      lastPlanting: formatDate(item.tanggal_tanam_terakhir),
+    }));
+  }, [lahanList]);
+
+  const commodityOptions = useMemo(() => {
+    const apiNames = allCommodities.map((c) => c.nama_komoditas).filter(Boolean);
+    const dataNames = enrichedList.map((i) => i.commodityName);
+    return [...new Set([...apiNames, ...dataNames])].sort();
+  }, [allCommodities, enrichedList]);
+
+  const locationOptions = useMemo(() => {
+    return [...new Set(enrichedList.map((i) => i.locationText).filter(Boolean))].sort();
+  }, [enrichedList]);
+
+  const filtered = useMemo(() => {
+    return enrichedList.filter((item) => {
+      const matchSearch =
+        !search ||
+        item.nama_lahan?.toLowerCase().includes(search.toLowerCase()) ||
+        item.ownerName?.toLowerCase().includes(search.toLowerCase()) ||
+        item.locationText?.toLowerCase().includes(search.toLowerCase());
+      const matchCommodity =
+        filterCommodity === 'semua' || item.commodityName === filterCommodity;
+      const matchLocation =
+        filterLocation === 'semua' || item.locationText === filterLocation;
+      return matchSearch && matchCommodity && matchLocation;
+    });
+  }, [enrichedList, search, filterCommodity, filterLocation]);
+
+  const summary = useMemo(() => {
+    const totalLuas = enrichedList.reduce((s, i) => s + i.areaHa, 0);
+    const commodities = new Set(enrichedList.map((i) => i.commodityName));
+    const owners = new Set(enrichedList.map((i) => i.ownerName));
+    return {
+      total: enrichedList.length,
+      totalLuas: formatArea(totalLuas),
+      commodities: commodities.size,
+      owners: owners.size,
+    };
+  }, [enrichedList]);
+
+  const selectedItem = useMemo(
+    () => enrichedList.find((i) => i.id_lahan === selectedId) || null,
+    [enrichedList, selectedId],
+  );
+
+  const summaryCards = [
+    { icon: 'land', label: 'Total Lahan Nonaktif', value: summary.total, note: 'lahan', tone: 'red' },
+    { icon: 'area', label: 'Total Luas', value: `${summary.totalLuas} ha`, note: 'area terdampak', tone: 'orange' },
+    { icon: 'crop', label: 'Komoditas Terdampak', value: summary.commodities, note: 'jenis', tone: 'blue' },
+    { icon: 'user', label: 'Petani Terdampak', value: summary.owners, note: 'petani', tone: 'teal' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="ltt-page">
+        <div className="ltt-skeleton ltt-skeleton-header" />
+        <div className="ltt-summary-grid">
+          {[1, 2, 3, 4].map((i) => (
+            <div className="ltt-skeleton ltt-skeleton-card" key={i} />
+          ))}
+        </div>
+        <div className="ltt-skeleton ltt-skeleton-table" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="ltt-page">
+      {/* Header */}
+      <header className="ltt-header">
+        <h1>Lahan Tidak Termanfaatkan</h1>
+        <p>
+          Daftar lahan petani yang berstatus nonaktif dan belum dimanfaatkan secara produktif.
+        </p>
+      </header>
+
+      {error && <div className="ltt-alert is-error">{error}</div>}
+
+      {/* Summary Cards */}
+      <section className="ltt-summary-grid">
+        {summaryCards.map((card) => (
+          <article className={`ltt-summary-card ${card.tone}`} key={card.label}>
+            <div className={`ltt-summary-icon ${card.tone}`}>
+              <LTTIcon name={card.icon} />
+            </div>
+            <div>
+              <p>{card.label}</p>
+              <strong>{card.value}</strong>
+              <small>{card.note}</small>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      {/* Filters */}
+      <section className="ltt-filter-bar">
+        <div className="ltt-search-wrap">
+          <LTTIcon name="search" />
+          <input
+            type="text"
+            placeholder="Cari nama lahan, pemilik, atau lokasi..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          value={filterCommodity}
+          onChange={(e) => setFilterCommodity(e.target.value)}
+        >
+          <option value="semua">Semua Komoditas</option>
+          {commodityOptions.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <select
+          value={filterLocation}
+          onChange={(e) => setFilterLocation(e.target.value)}
+        >
+          <option value="semua">Semua Lokasi</option>
+          {locationOptions.map((loc) => (
+            <option key={loc} value={loc}>{loc}</option>
+          ))}
+        </select>
+      </section>
+
+      {/* Table */}
+      <section className="ltt-table-card">
+        <div className="ltt-table-meta">
+          <span>Menampilkan {filtered.length} dari {enrichedList.length} lahan nonaktif</span>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="ltt-empty">
+            <LTTIcon name="land" />
+            <h3>Tidak ada lahan nonaktif</h3>
+            <p>Semua lahan petani saat ini berstatus aktif.</p>
+          </div>
+        ) : (
+          <div className="ltt-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama Lahan</th>
+                  <th>Pemilik</th>
+                  <th>Komoditas Terakhir</th>
+                  <th>Luas</th>
+                  <th>Lokasi</th>
+                  <th>Nonaktif Sejak</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => (
+                  <tr
+                    key={item.id_lahan}
+                    className="ltt-row"
+                    onClick={() => setSelectedId(item.id_lahan)}
+                  >
+                    <td>
+                      <strong>{item.nama_lahan || '-'}</strong>
+                    </td>
+                    <td>{item.ownerName}</td>
+                    <td>
+                      <span className="ltt-commodity-badge">
+                        {item.commodityName}
+                      </span>
+                    </td>
+                    <td>{item.areaLabel}</td>
+                    <td>
+                      <span className="ltt-location-text">
+                        <LTTIcon name="pin" />
+                        {item.locationText}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="ltt-time-badge">
+                        <LTTIcon name="clock" />
+                        {item.inactiveSince}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="ltt-detail-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedId(item.id_lahan);
+                        }}
+                      >
+                        Detail
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Detail Modal */}
+      {selectedItem && (
+        <div
+          className="ltt-modal-backdrop"
+          onClick={() => setSelectedId(null)}
+        >
+          <div
+            className="ltt-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="ltt-modal-close"
+              onClick={() => setSelectedId(null)}
+              type="button"
+              aria-label="Tutup"
+            >
+              <LTTIcon name="close" />
+            </button>
+
+            <div className="ltt-modal-header">
+              <span className="ltt-status-badge">Nonaktif</span>
+              <h2>{selectedItem.nama_lahan || 'Lahan'}</h2>
+              <p>{selectedItem.commodityName} • {selectedItem.areaLabel}</p>
+            </div>
+
+            <div className="ltt-modal-body">
+              <h3>Informasi Lahan</h3>
+              <div className="ltt-detail-grid">
+                <DetailField icon="land" label="Nama Lahan" value={selectedItem.nama_lahan} />
+                <DetailField icon="area" label="Luas Lahan" value={`${selectedItem.luas || '-'} ${selectedItem.satuan_luas || 'ha'}`} />
+                <DetailField icon="crop" label="Komoditas Terakhir" value={selectedItem.commodityName} />
+                <DetailField icon="pin" label="Lokasi" value={selectedItem.locationText} />
+                <DetailField icon="calendar" label="Tanam Terakhir" value={selectedItem.lastPlanting} />
+                <DetailField icon="clock" label="Nonaktif Sejak" value={`${formatDate(selectedItem.updated_at)} (${selectedItem.inactiveSince})`} />
+              </div>
+
+              <h3>Informasi Pemilik</h3>
+              <div className="ltt-detail-grid">
+                <DetailField icon="user" label="Nama Petani" value={selectedItem.ownerName} />
+                <DetailField icon="mail" label="Email" value={selectedItem.ownerEmail} />
+                <DetailField icon="phone" label="Telepon" value={selectedItem.ownerPhone} />
+              </div>
+
+              {(selectedItem.catatan || selectedItem.deskripsi) && (
+                <>
+                  <h3>Catatan</h3>
+                  <div className="ltt-detail-notes">
+                    <LTTIcon name="info" />
+                    <p>{selectedItem.catatan || selectedItem.deskripsi}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

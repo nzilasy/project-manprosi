@@ -110,10 +110,23 @@
   align-items: center;
   gap: 18px;
   padding: 18px 20px;
-  border: 1px solid #e6edf3;
+  border: 2px solid #e6edf3;
   border-radius: 14px;
   background: #ffffff;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  user-select: none;
+}
+
+.laporan-potensi-summary-card:hover {
+  border-color: #cbd7e2;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
+}
+
+.laporan-potensi-summary-card.is-active {
+  border-color: #16b981;
+  box-shadow: 0 0 0 3px rgba(22, 185, 129, 0.15), 0 12px 28px rgba(15, 23, 42, 0.07);
 }
 
 .laporan-potensi-summary-card > span {

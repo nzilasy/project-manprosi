@@ -5,7 +5,7 @@ import { laporanService } from '../../services/laporanService';
 import './LaporanPotensiPage.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 const LOCAL_STATUS_STORAGE_KEY = 'pengurus_laporan_potensi_status_overrides';
 
 const REPORT_STATUS_OPTIONS = [
@@ -463,27 +463,36 @@ function mapLaporanRows(laporan) {
   });
 }
 
-function mapUnusedLandRows(lahan) {
-  return lahan.filter(isUnusedLandReport).map((item) => {
+function mapLahanRows(lahan) {
+  return lahan.map((item) => {
+    const type = getLahanType(item);
     const commodity =
       item?.komoditas?.nama_komoditas ||
       item?.Komoditas?.nama_komoditas ||
       item?.commodity?.[0] ||
-      CATEGORY_CONFIG.lahan_kosong.label;
+      CATEGORY_CONFIG[type].label;
     const statusValue = normalizeReportStatus(
       item.status_laporan || item.status_proses || item.status_pelaporan,
     );
+    const sourceLabel =
+      type === 'lahan_kosong'
+        ? 'Laporan Lahan Tidak Termanfaatkan'
+        : 'Data Lahan Peta Komoditas';
+    const reporterRole = type === 'peternakan' ? 'Peternak' : 'Petani';
 
     return {
       id: `lahan-${item.id_lahan || item.id || item.id_peternakan || item.name}`,
       source: 'lahan',
-      sourceLabel: 'Laporan Lahan Tidak Termanfaatkan',
+      sourceLabel,
       date: item.created_at || item.updated_at || `${CURRENT_YEAR}-01-01`,
-      type: 'lahan_kosong',
-      title: `Usulan Pemanfaatan ${item.nama_lahan || item.name || 'Lahan Kosong'}`,
+      type,
+      title:
+        type === 'lahan_kosong'
+          ? `Usulan Pemanfaatan ${item.nama_lahan || item.name || 'Lahan Kosong'}`
+          : `Data Potensi ${item.nama_lahan || item.name || commodity}`,
       location: getLahanLocation(item),
-      reporter: getReporterName(item, 'Pengurus Desa'),
-      reporterRole: 'Pengurus Desa',
+      reporter: getReporterName(item, reporterRole),
+      reporterRole,
       statusValue,
       status: getStatusLabel(statusValue),
       areaHa: getAreaHa(item),
@@ -590,6 +599,41 @@ function DetailField({ label, value, wide = false }) {
   );
 }
 
+function mapInactiveLahanRows(lahanList) {
+  return lahanList.map((item) => {
+    const commodity =
+      item?.komoditas?.nama_komoditas ||
+      item?.Komoditas?.nama_komoditas ||
+      'Belum ditentukan';
+    const ownerName =
+      item?.user?.name || item?.User?.name || 'Petani';
+    const statusValue = normalizeReportStatus(
+      item.status_laporan || item.status_proses || 'belum_diproses',
+    );
+
+    return {
+      id: `lahan-kosong-${item.id_lahan || item.id}`,
+      source: 'lahan',
+      sourceLabel: 'Lahan Tidak Termanfaatkan',
+      sourceId: item.id_lahan || item.id,
+      date: item.updated_at || item.created_at || `${CURRENT_YEAR}-01-01`,
+      type: 'lahan_kosong',
+      title: item.nama_lahan || 'Lahan Nonaktif',
+      location: getLahanLocation(item),
+      reporter: ownerName,
+      reporterRole: 'Petani',
+      statusValue,
+      status: getStatusLabel(statusValue),
+      areaHa: getAreaHa(item),
+      areaLabel: formatAreaLabel(item),
+      commodity,
+      coordinates: getCoordinateLabel(item),
+      description: item.deskripsi || item.catatan || '-',
+      canUpdateStatus: true,
+    };
+  });
+}
+
 export default function LaporanPotensiPage() {
   const [rawRows, setRawRows] = useState([]);
   const [filters, setFilters] = useState({
@@ -597,7 +641,6 @@ export default function LaporanPotensiPage() {
     location: 'semua',
     type: 'semua',
   });
-  const [appliedFilters, setAppliedFilters] = useState(filters);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -615,12 +658,12 @@ export default function LaporanPotensiPage() {
       try {
         const [
           laporanResponse,
-          lahanResponse,
           kendalaWisataResponse,
+          inactiveLahanResponse,
         ] = await Promise.allSettled([
           laporanService.getAll({ limit: 100 }),
-          lahanService.getPublic(),
           kendalaWisataService.getAll({ limit: 100 }),
+          lahanService.getInactive(),
         ]);
 
         if (!active) return;
@@ -629,28 +672,28 @@ export default function LaporanPotensiPage() {
           laporanResponse.status === 'fulfilled'
             ? mapLaporanRows(getPayloadArray(laporanResponse.value))
             : [];
-        const unusedLandRows =
-          lahanResponse.status === 'fulfilled'
-            ? mapUnusedLandRows(getPayloadArray(lahanResponse.value))
-            : [];
         const wisataIssueRows =
           kendalaWisataResponse.status === 'fulfilled'
             ? mapKendalaWisataRows(getPayloadArray(kendalaWisataResponse.value))
+            : [];
+        const inactiveLahanRows =
+          inactiveLahanResponse.status === 'fulfilled'
+            ? mapInactiveLahanRows(getPayloadArray(inactiveLahanResponse.value))
             : [];
 
         const storedStatuses = readStoredStatuses();
         const combinedRows = sortRowsByDate([
           ...laporanRows,
-          ...unusedLandRows,
           ...wisataIssueRows,
+          ...inactiveLahanRows,
         ]);
 
         setRawRows(applyStoredStatuses(combinedRows, storedStatuses));
 
         if (
           laporanResponse.status === 'rejected' &&
-          lahanResponse.status === 'rejected' &&
-          kendalaWisataResponse.status === 'rejected'
+          kendalaWisataResponse.status === 'rejected' &&
+          inactiveLahanResponse.status === 'rejected'
         ) {
           setError('Data laporan belum tersedia dari server.');
         }
@@ -673,17 +716,17 @@ export default function LaporanPotensiPage() {
   const filteredRows = useMemo(() => {
     return rawRows.filter((row) => {
       const matchesYear =
-        appliedFilters.year === 'semua' ||
-        getYear(row.date) === Number(appliedFilters.year);
+        filters.year === 'semua' ||
+        getYear(row.date) === Number(filters.year);
       const matchesLocation =
-        appliedFilters.location === 'semua' ||
-        getDisplayLocation(row) === appliedFilters.location;
+        filters.location === 'semua' ||
+        getDisplayLocation(row) === filters.location;
       const matchesType =
-        appliedFilters.type === 'semua' || row.type === appliedFilters.type;
+        filters.type === 'semua' || row.type === filters.type;
 
       return matchesYear && matchesLocation && matchesType;
     });
-  }, [appliedFilters, rawRows]);
+  }, [filters, rawRows]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -715,8 +758,8 @@ export default function LaporanPotensiPage() {
     };
   }, [filteredRows]);
 
-  const handleApplyFilter = () => {
-    setAppliedFilters(filters);
+  const handleResetFilter = () => {
+    setFilters({ year: String(CURRENT_YEAR), location: 'semua', type: 'semua' });
     setPage(1);
   };
 
@@ -783,14 +826,15 @@ export default function LaporanPotensiPage() {
           <span>Tahun</span>
           <select
             value={filters.year}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, year: event.target.value }))
-            }
+            onChange={(event) => {
+              setFilters((current) => ({ ...current, year: event.target.value }));
+              setPage(1);
+            }}
           >
             <option value="semua">Semua Tahun</option>
             <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
           </select>
         </label>
 
@@ -798,12 +842,13 @@ export default function LaporanPotensiPage() {
           <span>Lokasi</span>
           <select
             value={filters.location}
-            onChange={(event) =>
+            onChange={(event) => {
               setFilters((current) => ({
                 ...current,
                 location: event.target.value,
-              }))
-            }
+              }));
+              setPage(1);
+            }}
           >
             <option value="semua">Semua Lokasi</option>
             {locationOptions.map((location) => (
@@ -818,9 +863,10 @@ export default function LaporanPotensiPage() {
           <span>Jenis Potensi</span>
           <select
             value={filters.type}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, type: event.target.value }))
-            }
+            onChange={(event) => {
+              setFilters((current) => ({ ...current, type: event.target.value }));
+              setPage(1);
+            }}
           >
             <option value="semua">Semua</option>
             {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
@@ -831,9 +877,9 @@ export default function LaporanPotensiPage() {
           </select>
         </label>
 
-        <button type="button" onClick={handleApplyFilter}>
+        <button type="button" onClick={handleResetFilter}>
           <ReportIcon name="filter" />
-          Filter
+          Reset
         </button>
       </section>
 
@@ -851,7 +897,18 @@ export default function LaporanPotensiPage() {
               : `dari ${Math.max(1, locationOptions.length)} lokasi`;
 
           return (
-            <article className="laporan-potensi-summary-card" key={key}>
+            <article
+              className={`laporan-potensi-summary-card${filters.type === key ? ' is-active' : ''}`}
+              key={key}
+              onClick={() => {
+                const nextType = filters.type === key ? 'semua' : key;
+                setFilters((current) => ({ ...current, type: nextType }));
+                setPage(1);
+              }}
+              style={{ cursor: 'pointer' }}
+              role="button"
+              tabIndex={0}
+            >
               <span style={{ backgroundColor: config.bg }} />
               <div>
                 <p>{config.summaryLabel}</p>

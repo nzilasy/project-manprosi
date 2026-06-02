@@ -209,7 +209,7 @@ function PickLocation({
   return null;
 }
 
-function MapFocus({ focusPosition, selectedPosition, focusZoom = SEARCH_MAP_ZOOM }) {
+function MapFocus({ focusPosition, focusZoom = SEARCH_MAP_ZOOM }) {
   const map = useMap();
 
   useEffect(() => {
@@ -217,13 +217,8 @@ function MapFocus({ focusPosition, selectedPosition, focusZoom = SEARCH_MAP_ZOOM
       map.flyTo(focusPosition, focusZoom, {
         duration: 0.8,
       });
-      return;
     }
-
-    if (selectedPosition) {
-      map.setView(selectedPosition, SELECTED_MAP_ZOOM);
-    }
-  }, [map, focusPosition, focusZoom, selectedPosition]);
+  }, [map, focusPosition, focusZoom]);
 
   return null;
 }
@@ -259,6 +254,7 @@ function getPlaceName(item) {
 function getLocationText(item) {
   return (
     getReadableLocation(
+      item.nama_tempat,
       item.lokasi_lahan,
       item.lokasi?.nama_lokasi,
       item.lokasi?.nama_desa,
@@ -1004,7 +1000,11 @@ export default function LahanPage() {
 
       {message && <div className="lahan-message">{message}</div>}
 
-      <div className="lahan-main-grid">
+      <div
+        className={`lahan-main-grid ${
+          selectedDetail ? 'is-detail-view' : ''
+        }`}
+      >
         {selectedDetail ? (
           <section className="lahan-detail-column">
             <button
@@ -1041,7 +1041,6 @@ export default function LahanPage() {
 
                 <MapFocus
                   focusPosition={mapFocusPosition}
-                  selectedPosition={activeMapPosition}
                 />
 
                 {orderedPolygonPoints.length >= 3 && (
@@ -1069,8 +1068,7 @@ export default function LahanPage() {
               </MapContainer>
 
               <small>
-                {MAP_SOURCE_TEXT} Klik peta untuk memperbarui titik lokasi
-                lahan.
+                {MAP_SOURCE_TEXT} Detail lokasi lahan.
               </small>
             </div>
 
@@ -1212,7 +1210,6 @@ export default function LahanPage() {
 
               <MapFocus
                 focusPosition={mapFocusPosition}
-                selectedPosition={activeMapPosition}
               />
 
               {/* Polygon lahan tersimpan selain yang sedang diedit */}
@@ -1458,205 +1455,197 @@ export default function LahanPage() {
         </section>
         )}
 
-        <aside
-          className={`lahan-form-card ${
-            selectedDetail ? 'lahan-detail-form-card' : ''
-          }`}
-        >
-          <h2>
-            {selectedDetail
-              ? 'Edit Informasi Lahan'
-              : editingId
-                ? 'Edit Lahan'
-                : 'Input Lahan Baru'}
-          </h2>
-          <p>Lengkapi informasi lahan Anda.</p>
+        {!selectedDetail && (
+          <aside className="lahan-form-card">
+            <h2>{editingId ? 'Edit Lahan' : 'Input Lahan Baru'}</h2>
+            <p>Lengkapi informasi lahan Anda.</p>
 
-          <form onSubmit={handleSubmit}>
-            <label>
-              Nama Lahan
-              <input
-                name="nama_lahan"
-                value={form.nama_lahan}
-                onChange={handleChange}
-                placeholder="Contoh: Lahan D-4 - Jagung"
-                required
-              />
-            </label>
-
-            <label>
-              Komoditas Utama
-              <select
-                name="id_komoditas"
-                value={form.id_komoditas}
-                onChange={handleChange}
-              >
-                <option value="">Pilih komoditas</option>
-
-                {komoditas.map((item) => (
-                  <option key={item.id_komoditas} value={item.id_komoditas}>
-                    {item.nama_komoditas}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Luas Lahan
-              <div className="lahan-inline-inputs">
+            <form onSubmit={handleSubmit}>
+              <label>
+                Nama Lahan
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  name="luas"
-                  value={form.luas}
+                  name="nama_lahan"
+                  value={form.nama_lahan}
                   onChange={handleChange}
-                  placeholder="Contoh: 1.5"
+                  placeholder="Contoh: Lahan D-4 - Jagung"
                   required
                 />
+              </label>
 
+              <label>
+                Komoditas Utama
                 <select
-                  name="satuan_luas"
-                  value={form.satuan_luas}
+                  name="id_komoditas"
+                  value={form.id_komoditas}
                   onChange={handleChange}
                 >
-                  <option value="ha">ha</option>
-                  <option value="m2">m²</option>
+                  <option value="">Pilih komoditas</option>
+
+                  {komoditas.map((item) => (
+                    <option key={item.id_komoditas} value={item.id_komoditas}>
+                      {item.nama_komoditas}
+                    </option>
+                  ))}
                 </select>
+              </label>
+
+              <label>
+                Luas Lahan
+                <div className="lahan-inline-inputs">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="luas"
+                    value={form.luas}
+                    onChange={handleChange}
+                    placeholder="Contoh: 1.5"
+                    required
+                  />
+
+                  <select
+                    name="satuan_luas"
+                    value={form.satuan_luas}
+                    onChange={handleChange}
+                  >
+                    <option value="ha">ha</option>
+                    <option value="m2">m²</option>
+                  </select>
+                </div>
+              </label>
+
+              <div className="lahan-location-field">
+                <label htmlFor="place_search">Patokan Lokasi</label>
+
+                <div className="lahan-location-search-row">
+                  <input
+                    id="place_search"
+                    value={placeSearchQuery}
+                    onChange={(event) => setPlaceSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        if (isDetailView) return;
+                        handleSearchPlace();
+                      }
+                    }}
+                    disabled={isDetailView}
+                    placeholder="Cari patokan tempat, desa, atau jalan"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleSearchPlace}
+                    disabled={isDetailView || placeSearchLoading}
+                  >
+                    {placeSearchLoading ? '...' : 'Cari'}
+                  </button>
+                </div>
+
+                {placeSearchResults.length > 0 && (
+                  <div className="lahan-location-results">
+                    {placeSearchResults.map((place) => (
+                      <button
+                        type="button"
+                        key={place.id}
+                        onClick={() => handleSelectPlace(place)}
+                      >
+                        {place.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </label>
 
-            <div className="lahan-location-field">
-              <label htmlFor="place_search">Patokan Lokasi</label>
-
-              <div className="lahan-location-search-row">
+              <label>
+                Nama Tempat
                 <input
-                  id="place_search"
-                  value={placeSearchQuery}
-                  onChange={(event) => setPlaceSearchQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      if (isDetailView) return;
-                      handleSearchPlace();
-                    }
-                  }}
-                  disabled={isDetailView}
-                  placeholder="Cari patokan tempat, desa, atau jalan"
+                  name="nama_tempat"
+                  value={form.nama_tempat}
+                  onChange={handleChange}
+                  placeholder="Contoh: Blok Cijambu atau Kebun Pak Budi"
+                  required
                 />
+              </label>
 
+              <div className="lahan-coordinate-grid">
+                <label>
+                  Latitude
+                  <input
+                    name="latitude"
+                    value={form.latitude}
+                    onChange={handleChange}
+                    disabled={isDetailView}
+                    placeholder="-6.9175"
+                  />
+                </label>
+
+                <label>
+                  Longitude
+                  <input
+                    name="longitude"
+                    value={form.longitude}
+                    onChange={handleChange}
+                    disabled={isDetailView}
+                    placeholder="107.6191"
+                  />
+                </label>
+              </div>
+
+              <label>
+                Tanggal Tanam Terakhir
+                <input
+                  type="date"
+                  name="tanggal_tanam_terakhir"
+                  value={form.tanggal_tanam_terakhir}
+                  onChange={handleChange}
+                  required
+                />
+              </label>
+
+              <label>
+                Status
+                <select
+                  name="status"
+                  value={form.status}
+                  onChange={handleChange}
+                >
+                  <option value="aktif">Aktif</option>
+                  <option value="nonaktif">Nonaktif</option>
+                </select>
+              </label>
+
+              <label>
+                Catatan Opsional
+                <textarea
+                  name="catatan"
+                  value={form.catatan}
+                  onChange={handleChange}
+                  placeholder="Tambahkan catatan tentang lahan ini..."
+                  rows="5"
+                />
+              </label>
+
+              <div className="lahan-form-actions">
                 <button
                   type="button"
-                  onClick={handleSearchPlace}
-                  disabled={isDetailView || placeSearchLoading}
+                  className="secondary"
+                  onClick={handleCancel}
                 >
-                  {placeSearchLoading ? '...' : 'Cari'}
+                  Batal
+                </button>
+
+                <button type="submit" disabled={saving}>
+                  {saving
+                    ? 'Menyimpan...'
+                    : editingId
+                      ? 'Simpan Perubahan'
+                      : 'Simpan Lahan'}
                 </button>
               </div>
-
-              {placeSearchResults.length > 0 && (
-                <div className="lahan-location-results">
-                  {placeSearchResults.map((place) => (
-                    <button
-                      type="button"
-                      key={place.id}
-                      onClick={() => handleSelectPlace(place)}
-                    >
-                      {place.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <label>
-              Nama Tempat
-              <input
-                name="nama_tempat"
-                value={form.nama_tempat}
-                onChange={handleChange}
-                placeholder="Contoh: Blok Cijambu atau Kebun Pak Budi"
-                required
-              />
-            </label>
-
-            <div className="lahan-coordinate-grid">
-              <label>
-                Latitude
-                <input
-                  name="latitude"
-                  value={form.latitude}
-                  onChange={handleChange}
-                  disabled={isDetailView}
-                  placeholder="-6.9175"
-                />
-              </label>
-
-              <label>
-                Longitude
-                <input
-                  name="longitude"
-                  value={form.longitude}
-                  onChange={handleChange}
-                  disabled={isDetailView}
-                  placeholder="107.6191"
-                />
-              </label>
-            </div>
-
-            <label>
-              Tanggal Tanam Terakhir
-              <input
-                type="date"
-                name="tanggal_tanam_terakhir"
-                value={form.tanggal_tanam_terakhir}
-                onChange={handleChange}
-                required
-              />
-            </label>
-
-            <label>
-              Status
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleChange}
-              >
-                <option value="aktif">Aktif</option>
-                <option value="nonaktif">Nonaktif</option>
-              </select>
-            </label>
-
-            <label>
-              Catatan Opsional
-              <textarea
-                name="catatan"
-                value={form.catatan}
-                onChange={handleChange}
-                placeholder="Tambahkan catatan tentang lahan ini..."
-                rows="5"
-              />
-            </label>
-
-            <div className="lahan-form-actions">
-              <button
-                type="button"
-                className="secondary"
-                onClick={handleCancel}
-              >
-                Batal
-              </button>
-
-              <button type="submit" disabled={saving}>
-                {saving
-                  ? 'Menyimpan...'
-                  : editingId
-                    ? 'Simpan Perubahan'
-                    : 'Simpan Lahan'}
-              </button>
-            </div>
-          </form>
-        </aside>
+            </form>
+          </aside>
+        )}
       </div>
     </div>
   );

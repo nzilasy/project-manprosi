@@ -312,6 +312,36 @@ router.get('/public', async (req, res) => {
 router.use(protect);
 router.use(authorize('petani', 'pengurus'));
 
+// GET /api/lahan/inactive — all inactive lahan (for pengurus)
+router.get('/inactive', async (req, res) => {
+  try {
+    const { User } = require('../models/index');
+
+    const lahan = await Lahan.findAll({
+      where: { status: 'nonaktif' },
+      include: [
+        ...includeLahan,
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id_user', 'name', 'email', 'phone'],
+          required: false,
+        },
+      ],
+      order: [['updated_at', 'DESC']],
+    });
+
+    return res.json({ data: lahan });
+  } catch (error) {
+    console.error('Get inactive lahan error:', error);
+
+    return res.status(500).json({
+      message: 'Gagal mengambil data lahan nonaktif.',
+      error: error.message,
+    });
+  }
+});
+
 // GET /api/lahan/summary
 router.get('/summary', async (req, res) => {
   try {

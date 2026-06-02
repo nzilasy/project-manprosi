@@ -28,7 +28,7 @@ import PengurusDashboard from './pages/pengurus/DashboardPage';
 import PotensiDesaPage from './pages/pengurus/PotensiDesaPage';
 import LaporanPotensiPage from './pages/pengurus/LaporanPotensiPage';
 import LahanTidakTermanfaatkanPage from './pages/pengurus/LahanTidakTermanfaatkanPage';
-import MasyarakatDashboard from './pages/masyarakat/DashboardPage';
+
 import MasyarakatWisataMapPage from './pages/masyarakat/WisataMapPage';
 import MasyarakatKomoditasMapPage from './pages/masyarakat/KomoditasMapPage';
 import WisataDashboard from './pages/wisata/DashboardPage';
@@ -83,7 +83,7 @@ export default function App() {
             {/* Masyarakat */}
             <Route element={<ProtectedRoute roles={['masyarakat']} />}>
               <Route element={<DashboardLayout />}>
-                <Route path="/masyarakat/dashboard" element={<MasyarakatDashboard />} />
+
                 <Route path="/masyarakat/wisata" element={<MasyarakatWisataMapPage />} />
                 <Route path="/masyarakat/komoditas" element={<MasyarakatKomoditasMapPage />} />
               </Route>
