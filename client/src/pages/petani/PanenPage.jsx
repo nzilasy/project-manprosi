@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { lahanService } from '../../services/lahanService';
 import { komoditasService } from '../../services/komoditasService';
 import { panenService } from '../../services/panenService';
@@ -35,8 +35,6 @@ const LIVESTOCK_TYPES = [
 ];
 
 function createDefaultForm() {
-  const today = new Date();
-
   return {
     id_lahan: '',
     id_komoditas: '',
@@ -52,10 +50,6 @@ function createDefaultForm() {
     harga_jual: '',
     keterangan: '',
   };
-}
-
-function toInputDate(date) {
-  return date.toISOString().slice(0, 10);
 }
 
 function formatNumber(value, fractionDigits = 2) {
@@ -230,6 +224,21 @@ function PanenIcon({ name, size = 18 }) {
         <path d="M12 3s6 6.2 6 11a6 6 0 0 1-12 0c0-4.8 6-11 6-11Z" />
       </svg>
     ),
+    edit: (
+      <svg {...commonProps}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      </svg>
+    ),
+    trash: (
+      <svg {...commonProps}>
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v5" />
+        <path d="M14 11v5" />
+      </svg>
+    ),
   };
 
   return icons[name] || null;
@@ -242,6 +251,8 @@ export default function PanenPage() {
   const [form, setForm] = useState(createDefaultForm);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -447,6 +458,74 @@ export default function PanenPage() {
       satuan_luas_panen: firstLahan?.satuan_luas || 'ha',
       satuan: normalizeHarvestUnit(firstCommodityName, nextForm.satuan),
     });
+    setEditingId(null);
+  };
+
+  const fillFormFromPanen = (item) => {
+    const historyLahan = item.lahan || item.Lahan;
+    const komoditasId =
+      item.id_komoditas || item.komoditas?.id_komoditas || item.Komoditas?.id_komoditas;
+    const commodityName =
+      item.komoditas?.nama_komoditas ||
+      item.Komoditas?.nama_komoditas ||
+      getCommodityName(historyLahan);
+    const isLivestock = isLivestockCommodity(commodityName);
+
+    setEditingId(item.id_panen);
+    setMessage('');
+    setError('');
+    setForm({
+      id_lahan: String(item.id_lahan || historyLahan?.id_lahan || ''),
+      id_komoditas: komoditasId ? String(komoditasId) : '',
+      jenis_ternak: item.jenis_ternak || '',
+      tanggal_mulai_periode: item.tanggal_mulai_periode || item.tanggal_panen || '',
+      tanggal_selesai_periode:
+        item.tanggal_selesai_periode || item.tanggal_panen || item.tanggal_mulai_periode || '',
+      luas_panen:
+        item.luas_panen !== undefined && item.luas_panen !== null
+          ? String(item.luas_panen)
+          : '',
+      satuan_luas_panen: item.satuan_luas_panen || historyLahan?.satuan_luas || 'ha',
+      jumlah:
+        item.jumlah !== undefined && item.jumlah !== null ? String(item.jumlah) : '',
+      satuan: normalizeHarvestUnit(commodityName, item.satuan || (isLivestock ? 'ekor' : 'ton')),
+      kadar_air:
+        item.kadar_air !== undefined && item.kadar_air !== null ? String(item.kadar_air) : '',
+      kualitas: item.kualitas || '',
+      harga_jual:
+        item.harga_jual !== undefined && item.harga_jual !== null
+          ? String(item.harga_jual)
+          : '',
+      keterangan: item.keterangan || '',
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (item) => {
+    if (!window.confirm('Yakin ingin menghapus data panen ini?')) {
+      return;
+    }
+
+    setDeletingId(item.id_panen);
+    setMessage('');
+    setError('');
+
+    try {
+      const { data } = await panenService.remove(item.id_panen);
+
+      setPanen((current) =>
+        current.filter((entry) => String(entry.id_panen) !== String(item.id_panen)),
+      );
+      if (String(editingId) === String(item.id_panen)) {
+        resetForm();
+      }
+      setMessage(data.message || 'Data panen berhasil dihapus.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Gagal menghapus data panen.'));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -456,15 +535,6 @@ export default function PanenPage() {
 
     if (!form.id_lahan) {
       setError('Pilih lahan terlebih dahulu sebelum menyimpan data panen.');
-      return;
-    }
-
-    const todayStr = toInputDate(new Date());
-    if (
-      form.tanggal_mulai_periode < todayStr ||
-      (!isLivestockSelected && form.tanggal_selesai_periode < todayStr)
-    ) {
-      setError('Tanggal panen/produksi tidak boleh di masa lalu.');
       return;
     }
 
@@ -498,13 +568,29 @@ export default function PanenPage() {
         keterangan: form.keterangan,
       };
 
-      const { data } = await panenService.create(payload);
+      const { data } = editingId
+        ? await panenService.update(editingId, payload)
+        : await panenService.create(payload);
 
-      setPanen((current) => [data.data, ...current]);
-      setMessage(data.message || 'Data panen berhasil disimpan.');
+      setPanen((current) => {
+        if (!editingId) return [data.data, ...current];
+
+        return current.map((item) =>
+          String(item.id_panen) === String(editingId) ? data.data : item,
+        );
+      });
+      setMessage(
+        data.message ||
+          (editingId ? 'Data panen berhasil diperbarui.' : 'Data panen berhasil disimpan.'),
+      );
       resetForm();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Gagal menyimpan data panen.'));
+      setError(
+        getApiErrorMessage(
+          err,
+          editingId ? 'Gagal memperbarui data panen.' : 'Gagal menyimpan data panen.',
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -524,7 +610,7 @@ export default function PanenPage() {
 
       <section className="panen-layout-grid">
         <article className="panen-form-card">
-          <h2>Form Input Hasil Panen</h2>
+          <h2>{editingId ? 'Edit Data Panen' : 'Form Input Hasil Panen'}</h2>
 
           <form onSubmit={handleSubmit}>
             <div className="panen-form-grid">
@@ -759,10 +845,16 @@ export default function PanenPage() {
 
             <div className="panen-form-actions">
               <button type="button" className="secondary" onClick={resetForm}>
-                Batal
+                {editingId ? 'Batal Edit' : 'Batal'}
               </button>
               <button type="submit" disabled={saving || lahan.length === 0}>
-                {saving ? 'Menyimpan...' : 'Simpan Data Panen'}
+                {saving
+                  ? editingId
+                    ? 'Memperbarui...'
+                    : 'Menyimpan...'
+                  : editingId
+                    ? 'Perbarui Data Panen'
+                    : 'Simpan Data Panen'}
               </button>
             </div>
           </form>
@@ -919,17 +1011,41 @@ export default function PanenPage() {
 
               return (
                 <article className="panen-history-item" key={item.id_panen}>
-                  <div>
-                    <strong>
-                      {historyLahan?.nama_lahan || 'Lahan'} - {historyKomoditas}
-                      {item.jenis_ternak ? ` (${item.jenis_ternak})` : ''}
-                    </strong>
-                    <p>
-                      {formatShortDate(item.tanggal_mulai_periode)} -{' '}
-                      {formatShortDate(
-                        item.tanggal_selesai_periode || item.tanggal_panen,
-                      )}
-                    </p>
+                  <div className="panen-history-info">
+                    <div>
+                      <strong>
+                        {historyLahan?.nama_lahan || 'Lahan'} - {historyKomoditas}
+                        {item.jenis_ternak ? ` (${item.jenis_ternak})` : ''}
+                      </strong>
+                      <p>
+                        {formatShortDate(item.tanggal_mulai_periode)} -{' '}
+                        {formatShortDate(
+                          item.tanggal_selesai_periode || item.tanggal_panen,
+                        )}
+                      </p>
+                    </div>
+                    <div className="panen-history-actions">
+                      <button
+                        type="button"
+                        className="panen-history-edit"
+                        onClick={() => fillFormFromPanen(item)}
+                        disabled={saving || deletingId === item.id_panen}
+                        title="Edit data panen"
+                      >
+                        <PanenIcon name="edit" size={14} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="panen-history-delete"
+                        onClick={() => handleDelete(item)}
+                        disabled={deletingId === item.id_panen}
+                        title="Hapus data panen"
+                      >
+                        <PanenIcon name="trash" size={14} />
+                        {deletingId === item.id_panen ? 'Menghapus...' : 'Hapus'}
+                      </button>
+                    </div>
                   </div>
                   <dl className="panen-history-metrics">
                     <div>
