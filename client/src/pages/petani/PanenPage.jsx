@@ -36,21 +36,19 @@ const LIVESTOCK_TYPES = [
 
 function createDefaultForm() {
   const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - 10);
 
   return {
     id_lahan: '',
     id_komoditas: '',
     jenis_ternak: '',
-    tanggal_mulai_periode: toInputDate(start),
-    tanggal_selesai_periode: toInputDate(today),
+    tanggal_mulai_periode: '',
+    tanggal_selesai_periode: '',
     luas_panen: '',
     satuan_luas_panen: 'ha',
     jumlah: '',
     satuan: 'ton',
     kadar_air: '',
-    kualitas: 'Premium',
+    kualitas: '',
     harga_jual: '',
     keterangan: '',
   };
@@ -133,6 +131,20 @@ function isLivestockCommodity(name) {
     'domba',
     'ayam',
   ].some((keyword) => normalizedName.includes(keyword));
+}
+
+function isVegetableCommodity(name) {
+  const normalizedName = String(name || '').toLowerCase();
+  return ['sayur', 'sayuran', 'hortikultura'].some((keyword) =>
+    normalizedName.includes(keyword),
+  );
+}
+
+function isGrainCommodity(name) {
+  const normalizedName = String(name || '').toLowerCase();
+  return ['padi', 'gabah', 'beras', 'jagung', 'kedelai', 'kacang', 'kopi', 'kakao', 'gandum'].some((keyword) =>
+    normalizedName.includes(keyword),
+  );
 }
 
 function getHarvestUnitOptions(commodityName) {
@@ -224,14 +236,10 @@ function PanenIcon({ name, size = 18 }) {
 }
 
 export default function PanenPage() {
-  const fileInputRef = useRef(null);
-  const objectUrlsRef = useRef([]);
-
   const [lahan, setLahan] = useState([]);
   const [komoditas, setKomoditas] = useState([]);
   const [panen, setPanen] = useState([]);
   const [form, setForm] = useState(createDefaultForm);
-  const [photoPreviews, setPhotoPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -254,7 +262,9 @@ export default function PanenPage() {
 
         if (!active) return;
 
-        const nextLahan = lahanResponse.data.data || [];
+        const nextLahan = (lahanResponse.data.data || []).filter(
+          (item) => item.status !== 'nonaktif'
+        );
         const nextKomoditas = komoditasResponse.data.data || [];
 
         setLahan(nextLahan);
@@ -304,11 +314,7 @@ export default function PanenPage() {
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
+
 
   const selectedLahan = useMemo(() => {
     return lahan.find((item) => String(item.id_lahan) === String(form.id_lahan));
@@ -324,6 +330,8 @@ export default function PanenPage() {
     selectedKomoditas?.nama_komoditas || getCommodityName(selectedLahan);
   const selectedCommodityImage = getCommodityImage(selectedCommodityName);
   const isLivestockSelected = isLivestockCommodity(selectedCommodityName);
+  const isVegetableSelected = isVegetableCommodity(selectedCommodityName);
+  const isGrainSelected = isGrainCommodity(selectedCommodityName);
   const harvestLabel = isLivestockSelected ? 'Hasil Produksi' : 'Hasil Panen';
   const productivityLabel = isLivestockSelected
     ? 'Produktivitas Produksi'
@@ -334,6 +342,23 @@ export default function PanenPage() {
     return calculateProductivity(form.jumlah, form.luas_panen);
   }, [form.jumlah, form.luas_panen]);
 
+  const estimasiBeratBersih = useMemo(() => {
+    if (!isGrainSelected || !form.jumlah || !form.kadar_air) return null;
+
+    const wAwal = Number(form.jumlah);
+    const kAwal = Number(form.kadar_air);
+    const targetKadarAir = 14; // Standar kering giling/simpan 14%
+
+    if (wAwal <= 0 || kAwal >= 100) return null;
+
+    // Jika sudah kering (<= 14%), berat bersih = berat awal (tidak menyusut lagi)
+    if (kAwal <= targetKadarAir) return wAwal;
+
+    // Rumus penyusutan berat berdasarkan kadar air: W2 = W1 * (100 - K1) / (100 - K2)
+    const wAkhir = (wAwal * (100 - kAwal)) / (100 - targetKadarAir);
+    return wAkhir;
+  }, [isGrainSelected, form.jumlah, form.kadar_air]);
+
   const selectedHistory = useMemo(() => {
     if (!form.id_lahan) return panen;
 
@@ -343,9 +368,10 @@ export default function PanenPage() {
     });
   }, [form.id_lahan, panen]);
 
-  const periodLabel = `${formatShortDate(
-    form.tanggal_mulai_periode,
-  )} - ${formatShortDate(form.tanggal_selesai_periode)}`;
+  const periodLabel = [
+    form.tanggal_mulai_periode ? formatShortDate(form.tanggal_mulai_periode) : null,
+    form.tanggal_selesai_periode ? formatShortDate(form.tanggal_selesai_periode) : null
+  ].filter(Boolean).join(' - ');
 
   const seasonYear =
     form.tanggal_selesai_periode?.slice(0, 4) ||
@@ -372,7 +398,7 @@ export default function PanenPage() {
         const nowLivestock = isLivestockCommodity(nextName);
 
         if (wasLivestock !== nowLivestock) {
-          updates.kualitas = nowLivestock ? 'Sehat' : 'Premium';
+          updates.kualitas = '';
           updates.jenis_ternak = nowLivestock ? '' : '';
         }
       }
@@ -403,37 +429,6 @@ export default function PanenPage() {
     }));
   };
 
-  const clearPhotos = () => {
-    photoPreviews.forEach((item) => URL.revokeObjectURL(item.url));
-    objectUrlsRef.current = objectUrlsRef.current.filter(
-      (url) => !photoPreviews.some((item) => item.url === url),
-    );
-    setPhotoPreviews([]);
-  };
-
-  const handlePhotoChange = (event) => {
-    const files = Array.from(event.target.files || []);
-    const remainingSlots = Math.max(0, 4 - photoPreviews.length);
-    const nextPhotos = files.slice(0, remainingSlots).map((file) => {
-      const url = URL.createObjectURL(file);
-      objectUrlsRef.current.push(url);
-
-      return {
-        name: file.name,
-        url,
-      };
-    });
-
-    setPhotoPreviews((current) => [...current, ...nextPhotos]);
-    event.target.value = '';
-  };
-
-  const removePhoto = (url) => {
-    URL.revokeObjectURL(url);
-    objectUrlsRef.current = objectUrlsRef.current.filter((item) => item !== url);
-    setPhotoPreviews((current) => current.filter((item) => item.url !== url));
-  };
-
   const resetForm = () => {
     const nextForm = createDefaultForm();
     const firstLahan = selectedLahan || lahan[0];
@@ -443,8 +438,6 @@ export default function PanenPage() {
     const firstCommodityName =
       komoditas.find((item) => String(item.id_komoditas) === firstKomoditasId)
         ?.nama_komoditas || getCommodityName(firstLahan);
-
-    clearPhotos();
 
     setForm({
       ...nextForm,
@@ -466,6 +459,20 @@ export default function PanenPage() {
       return;
     }
 
+    const todayStr = toInputDate(new Date());
+    if (
+      form.tanggal_mulai_periode < todayStr ||
+      (!isLivestockSelected && form.tanggal_selesai_periode < todayStr)
+    ) {
+      setError('Tanggal panen/produksi tidak boleh di masa lalu.');
+      return;
+    }
+
+    if (isGrainSelected && !form.kadar_air) {
+      setError('Kadar air wajib diisi untuk komoditas biji-bijian (padi, jagung, kedelai, dsb).');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -474,8 +481,12 @@ export default function PanenPage() {
         id_komoditas: form.id_komoditas ? Number(form.id_komoditas) : null,
         jenis_ternak: form.jenis_ternak || null,
         tanggal_mulai_periode: form.tanggal_mulai_periode,
-        tanggal_selesai_periode: form.tanggal_selesai_periode,
-        tanggal_panen: form.tanggal_selesai_periode,
+        tanggal_selesai_periode: isLivestockSelected
+          ? form.tanggal_mulai_periode
+          : form.tanggal_selesai_periode,
+        tanggal_panen: isLivestockSelected
+          ? form.tanggal_mulai_periode
+          : form.tanggal_selesai_periode,
         luas_panen: form.luas_panen,
         satuan_luas_panen: form.satuan_luas_panen,
         jumlah: form.jumlah,
@@ -484,7 +495,6 @@ export default function PanenPage() {
         kadar_air: form.kadar_air,
         kualitas: form.kualitas,
         harga_jual: form.harga_jual,
-        foto_panen: photoPreviews.map((item) => item.name),
         keterangan: form.keterangan,
       };
 
@@ -574,25 +584,34 @@ export default function PanenPage() {
               )}
 
               <label>
-                <span>{isLivestockSelected ? 'Periode Produksi' : 'Periode Panen'} <b>*</b></span>
-                <div className="panen-period-input">
+                <span>{isLivestockSelected ? 'Tanggal Produksi' : 'Periode Panen'} <b>*</b></span>
+                <div className={`panen-period-input ${isLivestockSelected ? 'is-single-date' : ''}`}>
                   <input
                     type="date"
                     value={form.tanggal_mulai_periode}
-                    onChange={(event) =>
-                      handleChange('tanggal_mulai_periode', event.target.value)
-                    }
+                    onChange={(event) => {
+                      handleChange('tanggal_mulai_periode', event.target.value);
+                      // Jika end date kosong atau sebelum start date, update end date juga
+                      if (!form.tanggal_selesai_periode || event.target.value > form.tanggal_selesai_periode) {
+                        handleChange('tanggal_selesai_periode', event.target.value);
+                      }
+                    }}
                     required
                   />
-                  <span>-</span>
-                  <input
-                    type="date"
-                    value={form.tanggal_selesai_periode}
-                    onChange={(event) =>
-                      handleChange('tanggal_selesai_periode', event.target.value)
-                    }
-                    required
-                  />
+                  {!isLivestockSelected && (
+                    <>
+                      <span>-</span>
+                      <input
+                        type="date"
+                        min={form.tanggal_mulai_periode}
+                        value={form.tanggal_selesai_periode}
+                        onChange={(event) =>
+                          handleChange('tanggal_selesai_periode', event.target.value)
+                        }
+                        required
+                      />
+                    </>
+                  )}
                   <PanenIcon name="calendar" />
                 </div>
               </label>
@@ -659,9 +678,16 @@ export default function PanenPage() {
                 </label>
               )}
 
-              {!isLivestockSelected && (
+              {!isLivestockSelected && !isVegetableSelected && (
                 <label>
-                  <span>Kadar Air (%)</span>
+                  <span>
+                    Kadar Air (%) {isGrainSelected && <b>*</b>}
+                    {isGrainSelected && (
+                      <small style={{ display: 'block', color: '#64748b', fontSize: '11px', marginTop: '2px', fontWeight: 'normal' }}>
+                        * Rekomendasi gabah/biji: 14-20%
+                      </small>
+                    )}
+                  </span>
                   <div className="panen-addon-input compact-addon">
                     <input
                       type="number"
@@ -671,6 +697,7 @@ export default function PanenPage() {
                       onChange={(event) =>
                         handleChange('kadar_air', event.target.value)
                       }
+                      required={isGrainSelected}
                     />
                     <span>%</span>
                   </div>
@@ -678,19 +705,22 @@ export default function PanenPage() {
               )}
 
               <label>
-                <span>{isLivestockSelected ? 'Kondisi' : 'Kualitas'}</span>
+                <span>{isLivestockSelected ? 'Kondisi' : 'Kualitas'} <b>*</b></span>
                 <select
                   value={form.kualitas}
                   onChange={(event) => handleChange('kualitas', event.target.value)}
+                  required
                 >
                   {isLivestockSelected ? (
                     <>
+                      <option value="" disabled>Pilih Kondisi</option>
                       <option value="Sehat">Sehat</option>
                       <option value="Cukup Sehat">Cukup Sehat</option>
-                      <option value="Perlu Perawatan">Perlu Perawatan</option>
+                      <option value="Afkir / Kurang Baik">Afkir / Kurang Baik</option>
                     </>
                   ) : (
                     <>
+                      <option value="" disabled>Pilih Kualitas</option>
                       <option value="Premium">Premium</option>
                       <option value="Baik">Baik</option>
                       <option value="Sedang">Sedang</option>
@@ -726,45 +756,6 @@ export default function PanenPage() {
                 placeholder="Tambahkan catatan mengenai hasil panen ini..."
               />
             </label>
-
-            <div className="panen-photo-field">
-              <span>Lampiran Foto (Opsional)</span>
-
-              <div className="panen-photo-list">
-                {photoPreviews.map((item) => (
-                  <div className="panen-photo-preview" key={item.url}>
-                    <img src={item.url} alt="" />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(item.url)}
-                      aria-label="Hapus foto"
-                    >
-                      x
-                    </button>
-                  </div>
-                ))}
-
-                {photoPreviews.length < 4 && (
-                  <button
-                    type="button"
-                    className="panen-photo-upload"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <PanenIcon name="upload" size={24} />
-                    <span>Tambah Foto</span>
-                  </button>
-                )}
-              </div>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handlePhotoChange}
-                hidden
-              />
-            </div>
 
             <div className="panen-form-actions">
               <button type="button" className="secondary" onClick={resetForm}>
@@ -864,24 +855,23 @@ export default function PanenPage() {
                   value={`${formatNumber(productivity)} ${form.satuan}/ha`}
                 />
               )}
-              {!isLivestockSelected && (
+              {!isLivestockSelected && !isVegetableSelected && (
                 <MetricCard
                   icon="water"
                   label="Rata-rata Kadar Air"
                   value={`${form.kadar_air || '0'}%`}
                 />
               )}
+              {isGrainSelected && estimasiBeratBersih !== null && (
+                <MetricCard
+                  icon="harvest"
+                  label="Estimasi Berat Bersih (Kering)"
+                  value={`${formatNumber(estimasiBeratBersih)} ${form.satuan}`}
+                />
+              )}
             </div>
           </article>
 
-          <article className="panen-tip-card">
-            <h2>Tips Petani</h2>
-            <p>
-              Pastikan kadar air gabah saat panen berkisar antara 14-20% untuk
-              mendapatkan kualitas terbaik.
-            </p>
-            <button type="button">Lihat Tips Lainnya</button>
-          </article>
         </aside>
       </section>
 
@@ -915,6 +905,17 @@ export default function PanenPage() {
               const itemProductivity =
                 item.produktivitas ||
                 calculateProductivity(item.jumlah, item.luas_panen);
+
+              const historyIsGrain = isGrainCommodity(historyKomoditas);
+              let itemEstimasiBersih = null;
+              if (historyIsGrain && item.jumlah && item.kadar_air) {
+                const wAwal = Number(item.jumlah);
+                const kAwal = Number(item.kadar_air);
+                if (wAwal > 0 && kAwal < 100) {
+                  itemEstimasiBersih =
+                    kAwal <= 14 ? wAwal : (wAwal * (100 - kAwal)) / 86; // 100 - 14 = 86
+                }
+              }
 
               return (
                 <article className="panen-history-item" key={item.id_panen}>
@@ -952,6 +953,24 @@ export default function PanenPage() {
                         {formatNumber(itemProductivity)} {item.satuan || 'ton'}/ha
                       </dd>
                     </div>
+
+                    {itemEstimasiBersih !== null && (
+                      <div>
+                        <dt>Estimasi Bersih</dt>
+                        <dd>
+                          {formatNumber(itemEstimasiBersih)} {item.satuan || 'ton'}
+                        </dd>
+                      </div>
+                    )}
+
+                    {Number(item.harga_jual) > 0 && (
+                      <div>
+                        <dt>Pendapatan</dt>
+                        <dd>
+                          Rp {formatNumber(Number(item.harga_jual) * Number(item.jumlah), 0)}
+                        </dd>
+                      </div>
+                    )}
                   </dl>
                 </article>
               );

@@ -7,6 +7,7 @@ const Kategori = require('./Kategori');
 const Komoditas = require('./Komoditas');
 const Panen = require('./Panen');
 const Wisata = require('./Wisata');
+const WisataRating = require('./WisataRating');
 const KunjunganWisata = require('./KunjunganWisata');
 const KendalaWisata = require('./KendalaWisata');
 const Laporan = require('./Laporan');
@@ -90,6 +91,27 @@ Wisata.belongsTo(Lokasi, {
   foreignKey: 'id_lokasi',
 });
 
+// Wisata -> WisataRating
+Wisata.hasMany(WisataRating, {
+  foreignKey: 'id_wisata',
+  as: 'ratings',
+});
+
+WisataRating.belongsTo(Wisata, {
+  foreignKey: 'id_wisata',
+  as: 'wisata',
+});
+
+User.hasMany(WisataRating, {
+  foreignKey: 'id_user',
+  as: 'wisata_ratings',
+});
+
+WisataRating.belongsTo(User, {
+  foreignKey: 'id_user',
+  as: 'user',
+});
+
 // Kategori -> Komoditas
 Kategori.hasMany(Komoditas, {
   foreignKey: 'id_kategori',
@@ -162,6 +184,7 @@ module.exports = {
   Komoditas,
   Panen,
   Wisata,
+  WisataRating,
   KunjunganWisata,
   KendalaWisata,
   Laporan,

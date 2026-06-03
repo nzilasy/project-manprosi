@@ -350,9 +350,20 @@ function getHarvestEstimate(item) {
 
   if (Number.isNaN(date.getTime())) return '-';
 
-  date.setMonth(date.getMonth() + 3);
+  const komoditas = getKomoditasText(item).toLowerCase();
+  let estimateMonths = 3; // Default untuk padi, jagung, kedelai, dsb.
 
-  return `${formatDateDisplay(date)} (+3 bulan)`;
+  if (['sayur', 'bayam', 'kangkung', 'sawi', 'selada', 'hortikultura'].some(k => komoditas.includes(k))) {
+    estimateMonths = 1;
+  } else if (['kopi', 'kakao', 'cengkeh', 'kelapa sawit', 'perkebunan'].some(k => komoditas.includes(k))) {
+    estimateMonths = 12;
+  } else if (['ternak', 'sapi', 'kambing', 'ayam', 'domba'].some(k => komoditas.includes(k))) {
+    return '-';
+  }
+
+  date.setMonth(date.getMonth() + estimateMonths);
+
+  return `${formatDateDisplay(date)} (+${estimateMonths} bulan)`;
 }
 
 function getPolygonPoints(item) {
@@ -484,6 +495,16 @@ export default function LahanPage() {
   const isDetailView = Boolean(selectedDetail);
   const canClearSelectedLocation = !editingId && !isDetailView;
 
+  const isLivestockForm = useMemo(() => {
+    const selectedName =
+      komoditas.find(
+        (item) => String(item.id_komoditas) === String(form.id_komoditas),
+      )?.nama_komoditas || '';
+    return ['ternak', 'sapi', 'kambing', 'ayam', 'domba'].some((k) =>
+      selectedName.toLowerCase().includes(k),
+    );
+  }, [form.id_komoditas, komoditas]);
+
   const loadData = async () => {
     setLoading(true);
     setMessage('');
@@ -558,7 +579,16 @@ export default function LahanPage() {
   };
 
   useEffect(() => {
-    if (!requestedDetailId || lahan.length === 0) {
+    if (!requestedDetailId) {
+      if (detailId !== null) {
+        setDetailId(null);
+        resetEditorState();
+        setMessage('');
+      }
+      return;
+    }
+
+    if (lahan.length === 0) {
       return;
     }
 
@@ -741,6 +771,7 @@ export default function LahanPage() {
     resetEditorState();
     navigate('/petani/lahan', { replace: true });
     setMessage('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleAddNew = () => {
@@ -859,11 +890,42 @@ export default function LahanPage() {
 
     if (!namaTempat) {
       setMessage('Nama tempat wajib diisi agar masyarakat dapat mengenali lokasi lahan.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (!form.id_komoditas) {
+      setMessage('Komoditas utama wajib dipilih.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
     if (!form.tanggal_tanam_terakhir) {
-      setMessage('Tanggal tanam terakhir wajib diisi.');
+      setMessage(
+        isLivestockForm
+          ? 'Tanggal mulai produksi wajib diisi.'
+          : 'Tanggal tanam terakhir wajib diisi.',
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const selectedDate = new Date(form.tanggal_tanam_terakhir);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      setMessage(
+        isLivestockForm
+          ? 'Tanggal mulai produksi tidak boleh di masa lalu (sebelum hari ini).'
+          : 'Tanggal tanam tidak boleh di masa lalu (sebelum hari ini).',
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (!form.latitude || !form.longitude) {
+      setMessage('Penanda lokasi (Latitude/Longitude) wajib diisi dengan mengklik titik pada peta.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -917,11 +979,13 @@ export default function LahanPage() {
         }
 
         setMessage('Data lahan berhasil diperbarui.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         await lahanService.create(payload);
         resetEditorState();
         await loadData();
         setMessage('Data lahan berhasil disimpan.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (error) {
       console.error('Save lahan error:', error);
@@ -929,6 +993,7 @@ export default function LahanPage() {
       setMessage(
         error.response?.data?.message || 'Gagal menyimpan data lahan.',
       );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
     }
@@ -1130,7 +1195,13 @@ export default function LahanPage() {
 
                   <DetailInfoItem
                     icon={<LahanIcon name="calendar" size={20} />}
-                    label="Tanggal Tanam Terakhir"
+                    label={
+                      ['ternak', 'sapi', 'kambing', 'ayam', 'domba'].some((k) =>
+                        getKomoditasText(selectedDetail).toLowerCase().includes(k),
+                      )
+                        ? 'Mulai Produksi'
+                        : 'Tanggal Tanam Terakhir'
+                    }
                     value={formatDateDisplay(
                       selectedDetail.tanggal_tanam_terakhir,
                     )}
@@ -1531,6 +1602,7 @@ export default function LahanPage() {
                     }}
                     disabled={isDetailView}
                     placeholder="Cari patokan tempat, desa, atau jalan"
+                    autoComplete="off"
                   />
 
                   <button
@@ -1577,6 +1649,7 @@ export default function LahanPage() {
                     onChange={handleChange}
                     disabled={isDetailView}
                     placeholder="-6.9175"
+                    autoComplete="off"
                   />
                 </label>
 
@@ -1588,17 +1661,19 @@ export default function LahanPage() {
                     onChange={handleChange}
                     disabled={isDetailView}
                     placeholder="107.6191"
+                    autoComplete="off"
                   />
                 </label>
               </div>
 
               <label>
-                Tanggal Tanam Terakhir
+                {isLivestockForm ? 'Mulai Produksi' : 'Tanggal Tanam Terakhir'}
                 <input
                   type="date"
                   name="tanggal_tanam_terakhir"
                   value={form.tanggal_tanam_terakhir}
                   onChange={handleChange}
+                  min={new Date().toISOString().split('T')[0]}
                   required
                 />
               </label>

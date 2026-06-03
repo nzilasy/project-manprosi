@@ -232,10 +232,38 @@ export default function PetaniDashboard() {
       (item) => (item.status || 'aktif').toLowerCase() === 'aktif',
     ).length;
 
-    const latestPanen = panenData.length > 0 ? panenData[0] : null;
-    const panenValue = latestPanen
-      ? `${formatArea(latestPanen.jumlah || latestPanen.hasil_panen || 0)} ton`
-      : '—';
+    let totalCrops = 0;
+    let totalLivestock = 0;
+    
+    panenData.forEach((item) => {
+      const amount = Number(item.jumlah || item.hasil_panen || 0);
+      const satuan = String(item.satuan || '').toLowerCase();
+      
+      if (['ekor', 'liter', 'butir'].includes(satuan)) {
+        totalLivestock += amount;
+      } else {
+        if (satuan === 'kg') totalCrops += amount / 1000;
+        else if (satuan === 'kwintal') totalCrops += amount / 10;
+        else totalCrops += amount; 
+      }
+    });
+
+    let panenValue = '—';
+    let panenNote = 'Belum ada data';
+    let panenLabel = 'Total Keseluruhan Panen';
+
+    if (totalCrops > 0 && totalLivestock > 0) {
+      panenValue = `${formatArea(totalCrops)} ton`;
+      panenNote = `+ ${formatArea(totalLivestock)} unit ternak`;
+      panenLabel = 'Total Panen & Ternak';
+    } else if (totalLivestock > 0) {
+      panenValue = `${formatArea(totalLivestock)}`;
+      panenNote = 'Ekor / Liter / Butir';
+      panenLabel = 'Total Produksi Ternak';
+    } else if (totalCrops > 0) {
+      panenValue = `${formatArea(totalCrops)} ton`;
+      panenNote = 'Seluruh lahan';
+    }
 
     const kendalaCount = laporanData.filter((item) => {
       const status = String(item.status || '').toLowerCase();
@@ -252,8 +280,9 @@ export default function PetaniDashboard() {
       lahanNote: lahanCount > 0
         ? activeLahan === lahanCount ? 'Semua aktif' : `${activeLahan} aktif`
         : 'Belum ada data',
+      panenLabel,
       panenValue,
-      panenNote: panenData.length > 0 ? 'Periode terakhir' : 'Belum ada data',
+      panenNote,
       totalLuas: totalLuas > 0 ? `${formatArea(totalLuas)} ha` : '—',
       luasNote: lahanCount > 0 ? `${lahanCount} lahan terdaftar` : '',
       kendalaCount,
@@ -270,7 +299,7 @@ export default function PetaniDashboard() {
       tone: 'green',
     },
     {
-      label: 'Panen Terakhir',
+      label: summary.panenLabel,
       value: summary.panenValue,
       note: summary.panenNote,
       icon: 'harvest',
@@ -296,25 +325,25 @@ export default function PetaniDashboard() {
   const recentActivities = useMemo(() => {
     const activities = [];
 
-    panenData.slice(0, 2).forEach((item) => {
+    panenData.forEach((item) => {
       const lahan = item.lahan || item.Lahan || {};
       activities.push({
         type: 'Panen',
         title: `Panen ${lahan.nama_lahan || item.komoditas || 'tanaman'} dicatat`,
         meta: `${formatArea(item.jumlah || item.hasil_panen || 0)} ton • ${
-          item.tanggal
+          item.tanggal_selesai_periode || item.tanggal_panen || item.created_at
             ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(
-                new Date(`${String(item.tanggal).slice(0, 10)}T00:00:00`),
+                new Date(`${String(item.tanggal_selesai_periode || item.tanggal_panen || item.created_at).slice(0, 10)}T00:00:00`),
               )
             : '-'
         }`,
         tone: 'green',
         to: '/petani/panen',
-        date: item.tanggal || item.created_at || '',
+        date: item.tanggal_selesai_periode || item.tanggal_panen || item.created_at || '',
       });
     });
 
-    laporanData.slice(0, 2).forEach((item) => {
+    laporanData.forEach((item) => {
       const lahan = item.lahan || item.Lahan || {};
       activities.push({
         type: 'Kendala',
@@ -328,11 +357,12 @@ export default function PetaniDashboard() {
       });
     });
 
-    lahanData.slice(0, 2).forEach((item) => {
+    lahanData.forEach((item) => {
       const komoditas = item?.komoditas?.nama_komoditas || item?.Komoditas?.nama_komoditas || '';
+      const isNew = !item.updated_at || item.created_at === item.updated_at;
       activities.push({
         type: 'Lahan',
-        title: `${item.nama_lahan || 'Lahan'} diperbarui`,
+        title: `${item.nama_lahan || 'Lahan'} ${isNew ? 'ditambahkan' : 'diperbarui'}`,
         meta: `${komoditas || 'Tanaman'}${item.luas ? ` • ${formatArea(getAreaInHa(item))} ha` : ''}`,
         tone: 'blue',
         to: '/petani/lahan',
@@ -491,10 +521,6 @@ export default function PetaniDashboard() {
               <h2>Aktivitas Terbaru</h2>
               <p>Ringkasan perubahan dari fitur lahan, panen, dan kendala</p>
             </div>
-            <Link to="/petani/panen" className="petani-view-all">
-              Lihat semua
-              <DashIcon name="chevronRight" />
-            </Link>
           </div>
 
           <div className="petani-activity-list">
@@ -552,7 +578,12 @@ export default function PetaniDashboard() {
       </section>
 
       {/* ── Tips Widget ── */}
-      <section className="petani-tips-card">
+      <section 
+        className="petani-tips-card" 
+        onClick={() => setTipIndex((prev) => (prev + 1) % FARMING_TIPS.length)}
+        style={{ cursor: 'pointer' }}
+        title="Klik untuk melihat tips selanjutnya"
+      >
         <div className="petani-tips-header">
           <DashIcon name="lightbulb" />
           <h3>Tips Pertanian Hari Ini</h3>

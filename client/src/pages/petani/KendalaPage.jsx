@@ -228,7 +228,9 @@ export default function KendalaPage() {
 
         if (!active) return;
 
-        const nextLahan = lahanResponse.data.data || [];
+        const nextLahan = (lahanResponse.data.data || []).filter(
+          (item) => item.status !== 'nonaktif'
+        );
 
         setLahan(nextLahan);
         setKomoditas(komoditasResponse.data.data || []);
@@ -386,6 +388,12 @@ export default function KendalaPage() {
       return;
     }
 
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (form.tanggal < todayStr) {
+      setError('Tanggal kejadian tidak boleh di masa lalu (sebelum hari ini).');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -520,6 +528,7 @@ export default function KendalaPage() {
                   <KendalaIcon name="calendar" />
                   <input
                     type="date"
+                    min={new Date().toISOString().slice(0, 10)}
                     value={form.tanggal}
                     onChange={(event) => handleChange('tanggal', event.target.value)}
                     required
@@ -535,9 +544,7 @@ export default function KendalaPage() {
                 <input
                   type="text"
                   value={form.lokasi_kendala}
-                  onChange={(event) =>
-                    handleChange('lokasi_kendala', event.target.value)
-                  }
+                  readOnly
                   placeholder="Cihareang, Kec. Cimahi, Kab. Kuningan, Jawa Barat"
                 />
               </div>
