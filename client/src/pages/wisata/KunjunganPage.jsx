@@ -12,6 +12,11 @@ import {
 } from 'recharts';
 import { kunjunganWisataService } from '../../services/kunjunganWisataService';
 import { wisataService } from '../../services/wisataService';
+import {
+  formatFormValidationMessage,
+  getEmptyFieldIssues,
+  scrollToPageTop,
+} from '../../utils/formValidation';
 import './KunjunganPage.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -22,9 +27,30 @@ const TREND_RANGE_OPTIONS = [
   { value: 'year', label: 'Tahun Ini' },
 ];
 
+function getLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentMonthRange() {
+  const today = getStartOfToday();
+  const start = new Date(today.getFullYear(), today.getMonth(), 1);
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  return {
+    start,
+    end,
+    startKey: getLocalDateKey(start),
+    endKey: getLocalDateKey(end),
+  };
+}
+
 const INITIAL_FORM = {
   id_wisata: '',
-  tanggal_mulai: new Date().toISOString().slice(0, 10),
+  tanggal_mulai: getLocalDateKey(new Date()),
   tanggal_selesai: '',
   jumlah_pengunjung: '',
   catatan: '',
@@ -80,7 +106,7 @@ function formatMonthYear(date) {
 }
 
 function toDateKey(date) {
-  return date.toISOString().slice(0, 10);
+  return getLocalDateKey(date);
 }
 
 function toMonthKey(date) {
@@ -91,6 +117,15 @@ function getStartOfToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today;
+}
+
+function isDateInCurrentMonth(value) {
+  if (!value) return false;
+
+  const date = new Date(`${value}T00:00:00`);
+  const { start, end } = getCurrentMonthRange();
+
+  return date >= start && date <= end;
 }
 
 function getVisitorsByYear(reports, year) {
@@ -156,7 +191,7 @@ function buildMonthlyReportRows(reports, year) {
   });
 }
 
-function buildTrendData(reports, range) {
+function buildTrendData(reports, range, year) {
   if (['year', '6months', '12months'].includes(range)) {
     const totalByMonth = new Map();
 
@@ -171,15 +206,20 @@ function buildTrendData(reports, range) {
     });
 
     const today = getStartOfToday();
-    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startMonth = new Date(currentMonth);
-    const endMonth = new Date(currentMonth);
+    const selectedYear = Number(year) || today.getFullYear();
+    const realCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const selectedCurrentMonth =
+      selectedYear === today.getFullYear()
+        ? realCurrentMonth
+        : new Date(selectedYear, 11, 1);
+    const startMonth = new Date(selectedYear, selectedCurrentMonth.getMonth(), 1);
+    const endMonth = new Date(startMonth);
 
     if (range === 'year') {
       startMonth.setMonth(0);
       endMonth.setMonth(11);
     } else {
-      startMonth.setMonth(currentMonth.getMonth() - (range === '12months' ? 11 : 5));
+      startMonth.setMonth(selectedCurrentMonth.getMonth() - (range === '12months' ? 11 : 5));
     }
 
     const monthCount =
@@ -190,15 +230,20 @@ function buildTrendData(reports, range) {
 
     let runningTotal = 0;
     let countedMonths = 0;
+    let lineRunningTotal = 0;
+    let lineMonthCount = 0;
     let previousVisitors = null;
 
     return Array.from({ length: monthCount }, (_, index) => {
       const date = new Date(startMonth);
       date.setMonth(startMonth.getMonth() + index);
       const key = toMonthKey(date);
-      const isFuture = date > currentMonth;
+      const isFuture = selectedYear === today.getFullYear() && date > realCurrentMonth;
       const monthlyVisitors = totalByMonth.get(key) || 0;
+      lineRunningTotal += monthlyVisitors;
+      lineMonthCount += 1;
       let trendAverage = null;
+      const trendLine = Math.round(lineRunningTotal / lineMonthCount);
       let change = null;
 
       if (!isFuture) {
@@ -219,6 +264,7 @@ function buildTrendData(reports, range) {
         tooltipLabel: formatMonthYear(date),
         pengunjung: monthlyVisitors,
         trend: trendAverage,
+        trendLine,
         change,
         isFuture,
       };
@@ -368,6 +414,7 @@ export default function KunjunganPage() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [reportYear, setReportYear] = useState(CURRENT_YEAR);
@@ -375,15 +422,21 @@ export default function KunjunganPage() {
   const trendRange = 'year';
   const chartScrollRef = useRef(null);
 
-  const trendData = useMemo(() => buildTrendData(reports, trendRange), [reports, trendRange]);
+  const trendData = useMemo(
+    () => buildTrendData(reports, trendRange, reportYear),
+    [reports, reportYear, trendRange],
+  );
   const trendRangeLabel =
-    TREND_RANGE_OPTIONS.find((item) => item.value === trendRange)?.label || 'Tahun Ini';
+    trendRange === 'year'
+      ? `Tahun ${reportYear}`
+      : TREND_RANGE_OPTIONS.find((item) => item.value === trendRange)?.label || `Tahun ${reportYear}`;
   const trendChartWidth = getTrendChartWidth(trendData.length, trendRange);
   const trendSummary = useMemo(() => getTrendSummary(trendData), [trendData]);
   const trendAxisLabel = ['year', '6months', '12months'].includes(trendRange)
     ? 'bulan'
     : 'tanggal';
   const showAllReports = location.pathname.endsWith('/riwayat');
+  const currentMonthRange = useMemo(() => getCurrentMonthRange(), []);
   const monthlyReportRows = useMemo(
     () => buildMonthlyReportRows(reports, reportYear),
     [reports, reportYear],
@@ -468,7 +521,11 @@ export default function KunjunganPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => {
+      loadData();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -490,14 +547,45 @@ export default function KunjunganPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setSubmitting(true);
     setError('');
     setMessage('');
 
+    const issues = getEmptyFieldIssues([
+      { key: 'id_wisata', label: 'Lokasi Wisata', value: form.id_wisata },
+      { key: 'tanggal_mulai', label: 'Tanggal Mulai', value: form.tanggal_mulai },
+      { key: 'tanggal_selesai', label: 'Tanggal Selesai', value: form.tanggal_selesai },
+      {
+        key: 'jumlah_pengunjung',
+        label: 'Jumlah Pengunjung',
+        value: form.jumlah_pengunjung,
+        test: (value) => value === '' || value === null || Number.isNaN(Number(value)),
+      },
+    ]);
+
+    if (issues.length > 0) {
+      setError(formatFormValidationMessage(issues));
+      scrollToPageTop();
+      return;
+    }
+
+    if (
+      !isDateInCurrentMonth(form.tanggal_mulai) ||
+      !isDateInCurrentMonth(form.tanggal_selesai)
+    ) {
+      setError('Tanggal laporan hanya boleh diisi untuk bulan berjalan.');
+      scrollToPageTop();
+      return;
+    }
+
+    if (form.tanggal_selesai && form.tanggal_selesai < form.tanggal_mulai) {
+      setError('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
+      scrollToPageTop();
+      return;
+    }
+
+    setSubmitting(true);
+
     try {
-      if (form.tanggal_selesai && form.tanggal_selesai < form.tanggal_mulai) {
-        throw new Error('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
-      }
 
       const catatan = [
         form.tanggal_selesai ? `Periode sampai: ${form.tanggal_selesai}` : '',
@@ -527,6 +615,33 @@ export default function KunjunganPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteReport = async (item) => {
+    const id = item.id_kunjungan || item.id;
+
+    if (!id) return;
+
+    const confirmed = window.confirm(
+      `Hapus laporan pengunjung ${getReportWisataName(item)} pada ${formatDate(item.tanggal_kunjungan)}?`,
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    setError('');
+    setMessage('');
+
+    try {
+      await kunjunganWisataService.remove(id);
+      setMessage('Riwayat pengunjung berhasil dihapus.');
+      await loadData();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal menghapus riwayat pengunjung.');
+      scrollToPageTop();
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -626,44 +741,61 @@ export default function KunjunganPage() {
         </table>
       </div>
 
-      <div className="kunjungan-month-detail">
-        <div>
-          <h3>Detail {selectedMonth?.monthLabel || reportYear}</h3>
-          <p>
-            {formatNumber(selectedMonth?.totalVisitors || 0)} pengunjung dari{' '}
-            {formatNumber(selectedMonth?.reportCount || 0)} laporan.
-          </p>
-        </div>
+      {showAllReports && (
+        <div className="kunjungan-month-detail">
+          <div>
+            <h3>Detail {selectedMonth?.monthLabel || reportYear}</h3>
+            <p>
+              {formatNumber(selectedMonth?.totalVisitors || 0)} pengunjung dari{' '}
+              {formatNumber(selectedMonth?.reportCount || 0)} laporan.
+            </p>
+          </div>
 
-        {selectedMonth?.reports?.length ? (
-          <div className="kunjungan-month-detail-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Lokasi Wisata</th>
-                  <th>Periode</th>
-                  <th>Pengunjung</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedMonth.reports.map((item) => (
-                  <tr key={item.id_kunjungan || item.id}>
-                    <td>{formatDate(item.tanggal_kunjungan)}</td>
-                    <td>{getReportWisataName(item)}</td>
-                    <td>{getReportPeriod(item)}</td>
-                    <td>{formatNumber(item.jumlah_pengunjung)}</td>
+          {selectedMonth?.reports?.length ? (
+            <div className="kunjungan-month-detail-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Lokasi Wisata</th>
+                    <th>Periode</th>
+                    <th>Pengunjung</th>
+                    <th>Aksi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="kunjungan-month-empty">
-            Belum ada laporan pengunjung pada bulan ini.
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {selectedMonth.reports.map((item) => {
+                    const id = item.id_kunjungan || item.id;
+
+                    return (
+                      <tr key={id}>
+                        <td>{formatDate(item.tanggal_kunjungan)}</td>
+                        <td>{getReportWisataName(item)}</td>
+                        <td>{getReportPeriod(item)}</td>
+                        <td>{formatNumber(item.jumlah_pengunjung)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="kunjungan-delete-report"
+                            disabled={deletingId === id}
+                            onClick={() => handleDeleteReport(item)}
+                          >
+                            {deletingId === id ? 'Menghapus...' : 'Hapus'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="kunjungan-month-empty">
+              Belum ada laporan pengunjung pada bulan ini.
+            </div>
+          )}
+        </div>
+      )}
     </article>
   );
 
@@ -703,15 +835,32 @@ export default function KunjunganPage() {
       </header>
 
       {message && <div className="kunjungan-message success">{message}</div>}
-      {error && <div className="kunjungan-message error">{error}</div>}
+
+      <section className="kunjungan-stat-grid kunjungan-overview-stats">
+        {yearlyRecaps.map((item, index) => (
+          <StatCard
+            key={item.year}
+            value={formatNumber(item.total)}
+            label={`Pengunjung ${item.year}`}
+            note={item.year === CURRENT_YEAR ? 'Tahun berjalan' : 'Tahun berikutnya'}
+            tone={['green', 'purple', 'orange', 'blue'][index]}
+          />
+        ))}
+      </section>
 
       <section className="kunjungan-layout">
         <article className="kunjungan-form-card">
           <h2>Buat Laporan Pengunjung</h2>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
+            {error && (
+              <div className="kunjungan-message error" role="alert">
+                {error}
+              </div>
+            )}
+
             <label>
-              Pilih Lokasi Wisata
+              Pilih Lokasi Wisata <strong>*</strong>
               <select
                 value={form.id_wisata}
                 onChange={(event) => handleChange('id_wisata', event.target.value)}
@@ -731,10 +880,12 @@ export default function KunjunganPage() {
             </label>
 
             <label>
-              Tanggal
+              Tanggal <strong>*</strong>
               <div className="kunjungan-date-row">
                 <input
                   type="date"
+                  min={currentMonthRange.startKey}
+                  max={currentMonthRange.endKey}
                   value={form.tanggal_mulai}
                   onChange={(event) => handleChange('tanggal_mulai', event.target.value)}
                   required
@@ -742,14 +893,17 @@ export default function KunjunganPage() {
                 <span>s/d</span>
                 <input
                   type="date"
+                  min={currentMonthRange.startKey}
+                  max={currentMonthRange.endKey}
                   value={form.tanggal_selesai}
                   onChange={(event) => handleChange('tanggal_selesai', event.target.value)}
+                  required
                 />
               </div>
             </label>
 
             <label>
-              Jumlah Pengunjung
+              Jumlah Pengunjung <strong>*</strong>
               <div className="kunjungan-input-unit">
                 <input
                   type="number"
@@ -872,7 +1026,7 @@ export default function KunjunganPage() {
                         />
                         <Line
                           type="monotone"
-                          dataKey="trend"
+                          dataKey="trendLine"
                           name="Rata-rata berjalan"
                           stroke="#5fbf70"
                           strokeWidth={2}
@@ -894,18 +1048,6 @@ export default function KunjunganPage() {
 
           {renderMonthlyReportCard()}
         </div>
-      </section>
-
-      <section className="kunjungan-stat-grid">
-        {yearlyRecaps.map((item, index) => (
-          <StatCard
-            key={item.year}
-            value={formatNumber(item.total)}
-            label={`Pengunjung ${item.year}`}
-            note={item.year === CURRENT_YEAR ? 'Tahun berjalan' : 'Tahun berikutnya'}
-            tone={['green', 'purple', 'orange', 'blue'][index]}
-          />
-        ))}
       </section>
     </div>
   );

@@ -63,6 +63,30 @@
   color: #b91c1c;
 }
 
+.wisata-form-validation-error {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.wisata-add-form label.wisata-field-missing input,
+.wisata-add-form label.wisata-field-missing select,
+.wisata-add-form label.wisata-field-missing textarea {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 1px #fecaca;
+}
+
+.wisata-add-map-hint.wisata-field-missing-hint {
+  color: #b91c1c;
+  font-weight: 850;
+}
+
 .wisata-add-panel {
   margin-bottom: 18px;
   padding: 22px;
@@ -93,7 +117,7 @@
   font-size: 13px;
 }
 
-.wisata-add-panel-header > button {
+.wisata-add-panel-header>button {
   width: 32px;
   height: 32px;
   display: grid;
@@ -138,6 +162,19 @@
   color: #dc2626;
 }
 
+.wisata-required-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+}
+
+.wisata-required-label::after {
+  content: '*';
+  color: #dc2626;
+  font-weight: 900;
+}
+
 .wisata-add-form input,
 .wisata-add-form select,
 .wisata-add-form textarea {
@@ -165,6 +202,81 @@
   line-height: 1.5;
 }
 
+.wisata-place-search-field {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.wisata-place-search-field > label {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.wisata-place-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+}
+
+.wisata-place-search-row input {
+  min-width: 0;
+}
+
+.wisata-place-search-row button {
+  height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: #577568;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.wisata-place-search-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.wisata-place-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: min(380px, 100%);
+  display: grid;
+  gap: 4px;
+  max-height: 190px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+}
+
+.wisata-place-results button {
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #172033;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wisata-place-results button:hover {
+  background: #f3faf6;
+  color: #315f4d;
+}
+
 .wisata-add-facilities {
   display: grid;
   gap: 9px;
@@ -174,6 +286,13 @@
   color: #334155;
   font-size: 12px;
   font-weight: 850;
+}
+
+.wisata-add-facilities.wisata-fieldset-missing {
+  padding: 12px;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  background: #fff7f7;
 }
 
 .wisata-add-facilities legend {
@@ -342,11 +461,11 @@
 }
 
 .wisata-marker-dot {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  border: 3px solid #ffffff;
+  border: 2.5px solid #ffffff;
   border-radius: 999px;
   background: var(--marker-color);
   color: #ffffff;
@@ -354,8 +473,8 @@
 }
 
 .wisata-marker-dot svg {
-  width: 23px;
-  height: 23px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -487,6 +606,37 @@
   color: #64748b;
   font-size: 11px;
   line-height: 1.4;
+}
+
+.wisata-draft-location-popup {
+  display: grid;
+  gap: 10px;
+  min-width: 188px;
+  padding: 12px 14px 14px;
+}
+
+.wisata-draft-location-popup strong {
+  color: #172033;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.wisata-draft-location-popup button {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.wisata-draft-location-popup button:hover {
+  background: #fee2e2;
 }
 
 .wisata-popup strong,
@@ -684,7 +834,7 @@
   justify-content: flex-end;
 }
 
-.wisata-list-tools > button {
+.wisata-list-tools>button {
   height: 34px;
   padding: 0 13px;
   border: 1px solid #dbe8e2;
@@ -732,6 +882,28 @@
   gap: 18px;
 }
 
+.wisata-card-scroll.is-expanded {
+  max-height: 620px;
+  overflow: auto;
+  padding-right: 8px;
+  scrollbar-gutter: stable;
+}
+
+.wisata-card-scroll.is-expanded::-webkit-scrollbar {
+  width: 9px;
+}
+
+.wisata-card-scroll.is-expanded::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #edf2f5;
+}
+
+.wisata-card-scroll.is-expanded::-webkit-scrollbar-thumb {
+  border: 2px solid #edf2f5;
+  border-radius: 999px;
+  background: #9fb0c3;
+}
+
 .wisata-card-grid.is-expanded {
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
 }
@@ -774,7 +946,7 @@
   outline-offset: -3px;
 }
 
-.wisata-location-card > div {
+.wisata-location-card>div {
   padding: 12px 14px 15px;
 }
 
@@ -829,29 +1001,91 @@
   white-space: nowrap;
 }
 
-.wisata-see-all-card {
-  min-height: 220px;
+.wisata-rating-form {
   display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 10px;
-  border: 1px dashed #172033;
-  border-radius: 9px;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e7edf3;
+}
+
+.wisata-rating-form label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.wisata-rating-form select,
+.wisata-rating-form textarea {
+  width: 100%;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
   background: #ffffff;
-  color: #707b8a;
-  font-size: 12px;
-  font-weight: 800;
+  color: #172033;
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.wisata-rating-form select {
+  height: 34px;
+  padding: 0 9px;
+}
+
+.wisata-rating-form textarea {
+  min-height: 58px;
+  resize: vertical;
+  padding: 9px;
+  line-height: 1.45;
+}
+
+.wisata-rating-form button {
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #577568;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
   cursor: pointer;
 }
 
-.wisata-see-all-card svg {
-  color: #7a7f85;
+.wisata-rating-form button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
-.wisata-see-all-card small {
-  color: #9aa7b6;
-  font-size: 10px;
-  font-weight: 800;
+.wisata-show-all-btn {
+  width: 100%;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 18px;
+  border: 1.5px solid #c9ddd5;
+  border-radius: 10px;
+  background: #f3faf6;
+  color: #2f6b52;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.wisata-show-all-btn:hover {
+  background: #e5f5ee;
+  border-color: #9fcaba;
+  box-shadow: 0 4px 14px rgba(47, 107, 82, 0.1);
+}
+
+.wisata-show-all-btn svg {
+  color: #3d7d5c;
 }
 
 .wisata-side-column {
@@ -909,7 +1143,7 @@
   accent-color: #577568;
 }
 
-.wisata-filter-card > button,
+.wisata-filter-card>button,
 .wisata-nearest-card button {
   height: 44px;
   border: 0;
@@ -940,6 +1174,17 @@
   padding: 0;
   list-style: none;
   counter-reset: nearest;
+}
+
+.wisata-nearest-empty {
+  margin: 0 0 18px;
+  padding: 11px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a5b12;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .wisata-nearest-card li {
@@ -1018,7 +1263,7 @@
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
 }
 
-.wisata-summary-card > span {
+.wisata-summary-card>span {
   width: 46px;
   height: 46px;
   display: grid;
@@ -1026,22 +1271,22 @@
   border-radius: 999px;
 }
 
-.wisata-summary-card.green > span {
+.wisata-summary-card.green>span {
   background: #e8f7ef;
   color: #3f7b55;
 }
 
-.wisata-summary-card.blue > span {
+.wisata-summary-card.blue>span {
   background: #eaf1ff;
   color: #4772af;
 }
 
-.wisata-summary-card.orange > span {
+.wisata-summary-card.orange>span {
   background: #fff1df;
   color: #c47b30;
 }
 
-.wisata-summary-card.purple > span {
+.wisata-summary-card.purple>span {
   background: #f7e8ff;
   color: #b64ac7;
 }

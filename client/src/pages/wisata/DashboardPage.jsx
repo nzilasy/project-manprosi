@@ -11,6 +11,11 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { kunjunganWisataService } from '../../services/kunjunganWisataService';
 import { wisataService } from '../../services/wisataService';
+import {
+  formatFormValidationMessage,
+  getEmptyFieldIssues,
+  scrollToPageTop,
+} from '../../utils/formValidation';
 import './DashboardPage.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -104,6 +109,7 @@ export default function WisataDashboard() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [popularSort, setPopularSort] = useState('pengunjung');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -113,8 +119,21 @@ export default function WisataDashboard() {
     user?.username ||
     'Pengelola Wisata';
 
-  const chartData = summary?.chart || [];
-  const popularWisata = summary?.wisata_populer || [];
+  const chartData = useMemo(() => summary?.chart || [], [summary]);
+  const popularWisata = useMemo(() => summary?.wisata_populer || [], [summary]);
+  const sortedPopularWisata = useMemo(() => {
+    return [...popularWisata].sort((a, b) => {
+      if (popularSort === 'terbaru') {
+        const aTime = Date.parse(a.created_at || a.createdAt || '');
+        const bTime = Date.parse(b.created_at || b.createdAt || '');
+        const newestDiff = (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+
+        if (newestDiff !== 0) return newestDiff;
+      }
+
+      return (Number(b.total_pengunjung) || 0) - (Number(a.total_pengunjung) || 0);
+    });
+  }, [popularSort, popularWisata]);
 
   const currentMonthVisitors = useMemo(() => {
     const monthIndex = new Date().getMonth();
@@ -163,7 +182,11 @@ export default function WisataDashboard() {
   };
 
   useEffect(() => {
-    loadDashboard();
+    const timer = window.setTimeout(() => {
+      loadDashboard();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
@@ -176,9 +199,27 @@ export default function WisataDashboard() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setSubmitting(true);
     setError('');
     setMessage('');
+
+    const issues = getEmptyFieldIssues([
+      { key: 'id_wisata', label: 'Lokasi Wisata', value: form.id_wisata },
+      { key: 'tanggal_kunjungan', label: 'Tanggal Kunjungan', value: form.tanggal_kunjungan },
+      {
+        key: 'jumlah_pengunjung',
+        label: 'Jumlah Pengunjung',
+        value: form.jumlah_pengunjung,
+        test: (value) => value === '' || value === null || Number.isNaN(Number(value)),
+      },
+    ]);
+
+    if (issues.length > 0) {
+      setError(formatFormValidationMessage(issues));
+      scrollToPageTop();
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       await kunjunganWisataService.create({
@@ -213,7 +254,6 @@ export default function WisataDashboard() {
       </header>
 
       {message && <div className="wisata-dashboard-message success">{message}</div>}
-      {error && <div className="wisata-dashboard-message error">{error}</div>}
 
       <section className="wisata-stat-grid">
         <StatCard
@@ -293,15 +333,18 @@ export default function WisataDashboard() {
               <h2>Wisata Terpopuler</h2>
               <label>
                 Urutkan
-                <select defaultValue="terbaru">
+                <select
+                  value={popularSort}
+                  onChange={(event) => setPopularSort(event.target.value)}
+                >
+                  <option value="pengunjung">Pengunjung Terbanyak</option>
                   <option value="terbaru">Terbaru</option>
-                  <option value="pengunjung">Pengunjung</option>
                 </select>
               </label>
             </div>
 
             <div className="wisata-popular-grid">
-              {popularWisata.slice(0, 3).map((item) => (
+              {sortedPopularWisata.slice(0, 3).map((item) => (
                 <article className="wisata-popular-item" key={item.id_wisata || item.id}>
                   <img src={getWisataImage(item)} alt="" />
                   <div>
@@ -325,13 +368,17 @@ export default function WisataDashboard() {
           <h2>Input Jumlah Pengunjung</h2>
           <p>Catat jumlah pengunjung pada wisata</p>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
+            {error && (
+              <div className="wisata-dashboard-message error" role="alert">
+                {error}
+              </div>
+            )}
             <label>
               Pilih Wisata <strong>*</strong>
               <select
                 value={form.id_wisata}
                 onChange={(event) => handleChange('id_wisata', event.target.value)}
-                required
               >
                 <option value="">Pilih lokasi wisata</option>
                 {wisataList.map((item) => (
@@ -348,7 +395,6 @@ export default function WisataDashboard() {
                 type="date"
                 value={form.tanggal_kunjungan}
                 onChange={(event) => handleChange('tanggal_kunjungan', event.target.value)}
-                required
               />
             </label>
 
@@ -361,7 +407,6 @@ export default function WisataDashboard() {
                   value={form.jumlah_pengunjung}
                   onChange={(event) => handleChange('jumlah_pengunjung', event.target.value)}
                   placeholder="Masukkan jumlah pengunjung"
-                  required
                 />
                 <span>Orang</span>
               </div>

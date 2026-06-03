@@ -1,6 +1,6 @@
 const express = require('express');
 const { Op } = require('sequelize');
-const { Wisata, Lokasi, Lahan, Peternakan, KunjunganWisata } = require('../models/index');
+const { Wisata, WisataRating, Lokasi, Lahan, Peternakan, KunjunganWisata } = require('../models/index');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
@@ -94,16 +94,56 @@ function uniqueLocationParts(parts) {
     });
 }
 
+function sanitizeAlamatPart(alamat, structuredParts, province) {
+  const normalized = normalizeLocationPart(alamat);
+
+  if (!normalized) return '';
+
+  const structuredKeys = new Set(
+    structuredParts.map((part) => part.toLowerCase()),
+  );
+  const provinceKey = normalizeLocationPart(province).toLowerCase();
+  const segments = normalized
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (segments.length <= 1) {
+    const key = segments[0]?.toLowerCase() || '';
+
+    if (structuredKeys.has(key) || (provinceKey && key === provinceKey)) {
+      return '';
+    }
+
+    return segments[0] || '';
+  }
+
+  const filtered = segments.filter((segment) => {
+    const key = segment.toLowerCase();
+
+    if (structuredKeys.has(key)) return false;
+    if (provinceKey && key === provinceKey) return false;
+
+    return !INDONESIAN_PROVINCES.includes(key);
+  });
+
+  return uniqueLocationParts(filtered).join(', ');
+}
+
 function getLocationText(lokasi) {
   if (!lokasi) return 'Lokasi belum diisi';
 
-  const locationParts = uniqueLocationParts([
-    lokasi.alamat,
+  const structuredParts = uniqueLocationParts([
     lokasi.desa_kelurahan,
     lokasi.kecamatan,
     lokasi.kabupaten_kota,
   ]);
   const province = normalizeLocationPart(lokasi.provinsi);
+  const alamatPart = sanitizeAlamatPart(lokasi.alamat, structuredParts, province);
+  const locationParts = uniqueLocationParts([
+    alamatPart,
+    ...structuredParts,
+  ]);
   const locationText = locationParts.join(', ').toLowerCase();
   const provinceKey = province.toLowerCase();
   const hasDifferentProvinceInInput = INDONESIAN_PROVINCES.some(
@@ -129,6 +169,20 @@ function normalizeInteger(value) {
 
   const number = Number(String(value).replace(/[^\d-]/g, ''));
   return Number.isNaN(number) ? null : number;
+}
+
+function normalizeRatingValue(value) {
+  const rating = normalizeNumber(value);
+
+  if (rating === null || rating < 1 || rating > 5) {
+    return null;
+  }
+
+  return Math.round(rating * 10) / 10;
+}
+
+function getAuthenticatedUserId(req) {
+  return req.user?.id || req.user?.id_user || req.user?.user_id || null;
 }
 
 function serializeWisata(row) {
@@ -172,6 +226,59 @@ function serializeWisata(row) {
     updated_at: item.updated_at,
   };
 }
+
+async function recalculateWisataRating(wisata, previousUserRating = null, nextUserRating = null) {
+  const currentRating = normalizeNumber(wisata.rating) ?? 0;
+  const currentReviews = normalizeInteger(wisata.jumlah_ulasan) ?? 0;
+  let totalReviews = currentReviews;
+  let totalScore = currentRating * currentReviews;
+
+  if (previousUserRating !== null) {
+    totalReviews -= 1;
+    totalScore -= previousUserRating;
+  }
+
+  if (nextUserRating !== null) {
+    totalReviews += 1;
+    totalScore += nextUserRating;
+  }
+
+  totalReviews = Math.max(totalReviews, 0);
+  const nextAverage = totalReviews > 0 ? totalScore / totalReviews : null;
+
+  await wisata.update({
+    rating: nextAverage === null ? null : Math.round(nextAverage * 100) / 100,
+    jumlah_ulasan: totalReviews,
+  });
+}
+
+// GET /api/wisata/public — public endpoint for landing page
+router.get('/public', async (req, res) => {
+  try {
+    const rows = await Wisata.findAll({
+      where: { status: 'aktif' },
+      include: [
+        {
+          model: Lokasi,
+          required: true,
+        },
+      ],
+      order: [['created_at', 'DESC']],
+      limit: 20,
+    });
+
+    const data = rows.map(serializeWisata).filter(Boolean);
+
+    return res.json({ data });
+  } catch (error) {
+    console.error('Get public wisata error:', error);
+
+    return res.status(500).json({
+      message: 'Gagal mengambil data wisata publik.',
+      error: error.message,
+    });
+  }
+});
 
 router.use(protect);
 router.use(authorize('petani', 'pengurus', 'masyarakat', 'wisata'));
@@ -225,6 +332,75 @@ async function listWisata(req, res) {
 
 router.get('/', listWisata);
 router.get('/points', listWisata);
+
+router.post('/:id/rating', authorize('masyarakat'), async (req, res) => {
+  try {
+    const idWisata = Number(req.params.id);
+    const idUser = getAuthenticatedUserId(req);
+    const nextRating = normalizeRatingValue(req.body.rating);
+    const ulasan = String(req.body.ulasan || '').trim() || null;
+
+    if (Number.isNaN(idWisata)) {
+      return res.status(400).json({ message: 'ID wisata tidak valid.' });
+    }
+
+    if (!idUser) {
+      return res.status(401).json({ message: 'User tidak valid.' });
+    }
+
+    if (nextRating === null) {
+      return res.status(400).json({ message: 'Rating harus diisi antara 1 sampai 5.' });
+    }
+
+    const wisata = await Wisata.findByPk(idWisata);
+
+    if (!wisata) {
+      return res.status(404).json({ message: 'Lokasi wisata tidak ditemukan.' });
+    }
+
+    const existing = await WisataRating.findOne({
+      where: {
+        id_wisata: idWisata,
+        id_user: idUser,
+      },
+    });
+    const previousRating = existing ? normalizeNumber(existing.rating) : null;
+
+    if (existing) {
+      await existing.update({ rating: nextRating, ulasan });
+    } else {
+      await WisataRating.create({
+        id_wisata: idWisata,
+        id_user: idUser,
+        rating: nextRating,
+        ulasan,
+      });
+    }
+
+    await recalculateWisataRating(wisata, previousRating, nextRating);
+
+    const updated = await Wisata.findByPk(idWisata, {
+      include: [
+        {
+          model: Lokasi,
+          required: false,
+        },
+      ],
+    });
+
+    return res.json({
+      message: existing ? 'Rating wisata berhasil diperbarui.' : 'Rating wisata berhasil disimpan.',
+      data: serializeWisata(updated),
+    });
+  } catch (error) {
+    console.error('Submit wisata rating error:', error);
+
+    return res.status(500).json({
+      message: 'Gagal menyimpan rating wisata.',
+      error: error.message,
+    });
+  }
+});
 
 router.post('/', authorize('wisata', 'pengurus'), async (req, res) => {
   try {
@@ -454,6 +630,10 @@ router.delete('/:id', authorize('wisata', 'pengurus'), async (req, res) => {
     const idLokasi = wisata.id_lokasi;
 
     await KunjunganWisata.destroy({
+      where: { id_wisata: idWisata },
+    });
+
+    await WisataRating.destroy({
       where: { id_wisata: idWisata },
     });
 

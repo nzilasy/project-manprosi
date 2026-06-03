@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { kendalaWisataService } from '../../services/kendalaWisataService';
 import { wisataService } from '../../services/wisataService';
+import {
+  formatFormValidationMessage,
+  getEmptyFieldIssues,
+  scrollToPageTop,
+} from '../../utils/formValidation';
 import './KendalaPage.css';
 
 const FALLBACK_IMAGE =
@@ -297,9 +302,25 @@ export default function WisataKendalaPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setSaving(true);
     setMessage('');
     setError('');
+
+    const issues = getEmptyFieldIssues([
+      { key: 'id_wisata', label: 'Lokasi Wisata', value: form.id_wisata },
+      { key: 'kategori', label: 'Kategori Kendala', value: form.kategori },
+      { key: 'tingkat_keparahan', label: 'Tingkat Keparahan', value: form.tingkat_keparahan },
+      { key: 'tanggal', label: 'Tanggal Kejadian', value: form.tanggal },
+      { key: 'judul', label: 'Judul Kendala', value: form.judul },
+      { key: 'deskripsi', label: 'Deskripsi Kendala', value: form.deskripsi },
+    ]);
+
+    if (issues.length > 0) {
+      setError(formatFormValidationMessage(issues));
+      scrollToPageTop();
+      return;
+    }
+
+    setSaving(true);
 
     try {
       const { data } = await kendalaWisataService.create({
@@ -334,7 +355,6 @@ export default function WisataKendalaPage() {
       </header>
 
       {message && <div className="wisata-kendala-message success">{message}</div>}
-      {error && <div className="wisata-kendala-message error">{error}</div>}
 
       <section className="wisata-kendala-stat-grid">
         <StatCard icon="file" label="Total Laporan" value={summary.total} />
@@ -350,7 +370,12 @@ export default function WisataKendalaPage() {
             <p>Isi detail kendala dan pilih lokasi wisata terkait.</p>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
+            {error && (
+              <div className="wisata-kendala-message error" role="alert">
+                {error}
+              </div>
+            )}
             <div className="wisata-kendala-form-grid">
               <label>
                 Pilih Lokasi Wisata <strong>*</strong>
@@ -358,7 +383,6 @@ export default function WisataKendalaPage() {
                   value={form.id_wisata}
                   onChange={(event) => handleWisataChange(event.target.value)}
                   disabled={loading || wisataList.length === 0}
-                  required
                 >
                   <option value="">Pilih lokasi wisata</option>
                   {wisataList.map((item) => {
@@ -378,7 +402,6 @@ export default function WisataKendalaPage() {
                 <select
                   value={form.kategori}
                   onChange={(event) => handleChange('kategori', event.target.value)}
-                  required
                 >
                   <option value="">Pilih kategori</option>
                   {CATEGORIES.map((category) => (
@@ -394,7 +417,6 @@ export default function WisataKendalaPage() {
                 <select
                   value={form.tingkat_keparahan}
                   onChange={(event) => handleChange('tingkat_keparahan', event.target.value)}
-                  required
                 >
                   {SEVERITY_OPTIONS.map((item) => (
                     <option value={item.value} key={item.value}>
@@ -410,7 +432,6 @@ export default function WisataKendalaPage() {
                   type="date"
                   value={form.tanggal}
                   onChange={(event) => handleChange('tanggal', event.target.value)}
-                  required
                 />
               </label>
             </div>
@@ -422,7 +443,6 @@ export default function WisataKendalaPage() {
                 value={form.judul}
                 onChange={(event) => handleChange('judul', event.target.value)}
                 placeholder="Contoh: Akses jalan menuju lokasi rusak"
-                required
               />
             </label>
 
@@ -446,7 +466,6 @@ export default function WisataKendalaPage() {
                 onChange={(event) => handleChange('deskripsi', event.target.value)}
                 placeholder="Jelaskan kondisi, dampak, dan kebutuhan tindak lanjut..."
                 maxLength={1000}
-                required
               />
               <small>{form.deskripsi.length}/1000</small>
             </label>

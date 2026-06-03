@@ -591,13 +591,13 @@ export default function KomoditasMapPage() {
 
   const summary = useMemo(() => {
     return COMMODITY_FILTERS.map((category) => {
-      const totalArea = filteredLahan
-        .filter((item) => item.commodityKey === category.key)
-        .reduce((sum, item) => sum + item.areaHa, 0);
+      const categoryItems = filteredLahan.filter((item) => item.commodityKey === category.key);
+      const totalArea = categoryItems.reduce((sum, item) => sum + item.areaHa, 0);
 
       return {
         ...category,
         totalArea,
+        count: categoryItems.length,
       };
     });
   }, [filteredLahan]);
@@ -772,7 +772,7 @@ export default function KomoditasMapPage() {
                   <div>
                     <p>{item.label}</p>
                     <strong>{formatArea(item.totalArea)} ha</strong>
-                    <small>Total Luas</small>
+                    <small>Dari {item.count} titik lahan</small>
                   </div>
                 </article>
               ))}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { aiService } from '../../services/aiService';
 import './AiChatPage.css';
 
@@ -120,13 +120,13 @@ const AI_CONFIGS = {
       },
     ],
     topics: PETANI_TOPICS,
-    heading: 'Tanya Ai',
-    subtitle: 'Dapatkan rekomendasi dan jawaban seputar pertanian dari Ai.',
+    heading: 'Tanya AI',
+    subtitle: 'Dapatkan rekomendasi dan jawaban seputar pertanian dari AI.',
     emptyTitle: 'Mulai percakapan pertanian',
     emptyText: 'Pilih topik populer atau tulis pertanyaan tentang lahan, panen, hama, dan peningkatan potensi.',
     placeholder: 'Tanyakan apa saja tentang pertanian...',
-    typingText: 'Ai sedang menyusun rekomendasi...',
-    tipLabel: 'Tips AgroAi',
+    typingText: 'AI sedang menyusun rekomendasi...',
+    tipLabel: 'Tips AgroAI',
   },
   pengurus: {
     context: 'pengurus',
@@ -141,13 +141,13 @@ const AI_CONFIGS = {
       },
     ],
     topics: PENGURUS_TOPICS,
-    heading: 'Tanya Ai',
+    heading: 'Tanya AI',
     subtitle: 'Dapatkan rekomendasi untuk memantau potensi, laporan, dan tindak lanjut wilayah desa.',
     emptyTitle: 'Mulai analisis potensi desa',
     emptyText: 'Pilih topik populer atau tulis pertanyaan tentang laporan potensi, lahan kosong, wisata, dan prioritas tindak lanjut.',
     placeholder: 'Tanyakan tentang potensi desa, laporan, atau tindak lanjut...',
-    typingText: 'Ai sedang menyusun rekomendasi pengurus desa...',
-    tipLabel: 'Catatan AgroAi',
+    typingText: 'AI sedang menyusun rekomendasi pengurus desa...',
+    tipLabel: 'Catatan AgroAI',
   },
 };
 
@@ -312,6 +312,14 @@ export default function AiChatPage({ variant = 'petani' }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const textareaRef = useRef(null);
+
+  const scrollToInput = () => {
+    setTimeout(() => {
+      textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      textareaRef.current?.focus();
+    }, 50);
+  };
 
   const currentSession = useMemo(() => {
     return sessions.find(s => s.id === activeSessionId) || null;
@@ -481,6 +489,7 @@ export default function AiChatPage({ variant = 'petani' }) {
 
           <form className="ai-chat-input" onSubmit={handleSubmit}>
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(event) => setInput(event.target.value.slice(0, MAX_MESSAGE_LENGTH))}
               onKeyDown={(event) => {
@@ -499,7 +508,7 @@ export default function AiChatPage({ variant = 'petani' }) {
           </form>
 
           <p className="ai-disclaimer">
-            Ai dapat membuat kesalahan. Jawaban Ai tidak menggantikan saran ahli.
+            AI dapat membuat kesalahan. Jawaban AI tidak menggantikan saran ahli.
           </p>
         </main>
 
@@ -513,7 +522,7 @@ export default function AiChatPage({ variant = 'petani' }) {
                   type="button"
                   className="ai-topic-item"
                   key={topic.title}
-                  onClick={() => sendQuestion(topic.question)}
+                  onClick={() => { sendQuestion(topic.question); scrollToInput(); }}
                   disabled={loading}
                 >
                   <span className={`ai-topic-icon ${topic.tone}`}>
@@ -585,6 +594,106 @@ function TopicIcon({ title }) {
   return <AiIcon name="plant" size={18} />;
 }
 
+/**
+ * Renders plain-text Markdown from the AI into structured HTML.
+ * Supports: **bold**, *italic*, # headings, numbered lists, bullet lists, and paragraphs.
+ */
+function MarkdownContent({ text }) {
+  const lines = text.split('\n');
+  const elements = [];
+  let listBuffer = [];
+  let listType = null; // 'ul' | 'ol'
+
+  const flushList = () => {
+    if (listBuffer.length === 0) return;
+    const Tag = listType;
+    elements.push(
+      <Tag key={`list-${elements.length}`} className="ai-md-list">
+        {listBuffer.map((item, i) => (
+          <li key={i}><InlineMarkdown text={item} /></li>
+        ))}
+      </Tag>
+    );
+    listBuffer = [];
+    listType = null;
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    // Heading: ### or ## or #
+    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1].length;
+      const Tag = `h${Math.min(level + 2, 6)}`; // h3, h4, h5
+      elements.push(
+        <Tag key={index} className={`ai-md-heading ai-md-h${level}`}>
+          <InlineMarkdown text={headingMatch[2]} />
+        </Tag>
+      );
+      return;
+    }
+
+    // Numbered list: 1. item
+    const olMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+    if (olMatch) {
+      if (listType !== 'ol') { flushList(); listType = 'ol'; }
+      listBuffer.push(olMatch[2]);
+      return;
+    }
+
+    // Bullet list: * item or - item
+    const ulMatch = trimmed.match(/^[*\-]\s+(.+)$/);
+    if (ulMatch) {
+      if (listType !== 'ul') { flushList(); listType = 'ul'; }
+      listBuffer.push(ulMatch[1]);
+      return;
+    }
+
+    // Empty line = flush list + paragraph separator
+    if (trimmed === '') {
+      flushList();
+      elements.push(<div key={index} className="ai-md-spacer" />);
+      return;
+    }
+
+    // Regular paragraph
+    flushList();
+    elements.push(
+      <p key={index} className="ai-md-para">
+        <InlineMarkdown text={trimmed} />
+      </p>
+    );
+  });
+
+  flushList();
+
+  return <div className="ai-md-body">{elements}</div>;
+}
+
+/** Renders inline Markdown: **bold**, *italic* */
+function InlineMarkdown({ text }) {
+  // Split on **bold** and *italic* patterns
+  const parts = [];
+  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  let last = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    if (match[0].startsWith('**')) {
+      parts.push(<strong key={match.index}>{match[2]}</strong>);
+    } else {
+      parts.push(<em key={match.index}>{match[3]}</em>);
+    }
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+
+  return <>{parts}</>;
+}
+
 function ChatMessage({ message, tipLabel }) {
   const isUser = message.role === 'user';
 
@@ -594,7 +703,9 @@ function ChatMessage({ message, tipLabel }) {
 
       <div className={`ai-message-stack ${isUser ? 'user' : 'assistant'}`}>
         <div className={`ai-bubble ${isUser ? 'user' : 'assistant'}`}>
-          <div className="ai-message-text">{message.content}</div>
+          <div className="ai-message-text">
+            {isUser ? message.content : <MarkdownContent text={message.content} />}
+          </div>
 
           {message.tip && (
             <div className="ai-tip-box">

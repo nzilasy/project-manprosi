@@ -11,10 +11,14 @@ import {
 import L from 'leaflet';
 import { useAuth } from '../../context/AuthContext';
 import { wisataService } from '../../services/wisataService';
+import {
+  formatFormValidationMessage,
+  getEmptyFieldIssues,
+  scrollToPageTop,
+} from '../../utils/formValidation';
 import './WisataMapPage.css';
 
 const DEFAULT_CENTER = [-6.829512, 107.798604];
-const CURRENT_LOCATION_FALLBACK = DEFAULT_CENTER;
 const DEFAULT_MAP_ZOOM = 13;
 const FOCUS_MAP_ZOOM = 14;
 const SELECTED_PLACE_ZOOM = 17;
@@ -30,7 +34,7 @@ const INDONESIA_BOUNDS = [
 const FACILITY_OPTIONS = ['Parkir', 'Toilet', 'Musholla', 'Kuliner', 'Penginapan'];
 const ADD_WISATA_INITIAL_FORM = {
   nama_wisata: '',
-  jenis_wisata: 'Alam',
+  jenis_wisata: '',
   status: 'aktif',
   alamat: '',
   desa_kelurahan: '',
@@ -46,11 +50,6 @@ const ADD_WISATA_INITIAL_FORM = {
   foto: '',
   deskripsi: '',
 };
-
-const WISATA_STATUS_OPTIONS = [
-  { value: 'baru_dibuka', label: 'Baru Dibuka' },
-  { value: 'aktif', label: 'Aktif' },
-];
 
 const CATEGORY_CONFIG = {
   alam: {
@@ -250,6 +249,33 @@ function getWisataStatusLabel(value) {
   return isNewlyOpenedStatus(value) ? 'Baru Dibuka' : 'Aktif';
 }
 
+function getPlaceResultName(item) {
+  const address = item?.address || {};
+  const primary =
+    item?.namedetails?.name ||
+    item?.name ||
+    address.road ||
+    address.village ||
+    address.town ||
+    address.city ||
+    address.county ||
+    item?.display_name;
+  const secondary = [
+    address.suburb,
+    address.village,
+    address.town,
+    address.city,
+    address.county,
+    address.state,
+  ]
+    .filter(Boolean)
+    .filter((part, index, parts) => parts.indexOf(part) === index)
+    .slice(0, 3)
+    .join(', ');
+
+  return secondary && primary !== secondary ? `${primary}, ${secondary}` : primary;
+}
+
 function createWisataMarkerIcon(config) {
   return L.divIcon({
     className: 'wisata-marker-wrapper',
@@ -311,8 +337,14 @@ function normalizeWisata(item) {
     name: item.name || item.nama_wisata || 'Lokasi Wisata',
     category,
     categoryKey: normalizeCategory(category),
-    location: item.location || item.address || 'Lokasi belum diisi',
-    address: item.address || item.lokasi?.alamat || '',
+    location:
+      item.location ||
+      item.address ||
+      item.alamat ||
+      item.lokasi?.alamat ||
+      item.Lokasi?.alamat ||
+      'Lokasi belum diisi',
+    address: item.address || item.alamat || item.lokasi?.alamat || item.Lokasi?.alamat || '',
     position: getPosition(item),
     facilities,
     photos: Array.isArray(item.photos)
@@ -347,9 +379,9 @@ function calculateDistanceKm(from, to) {
   const a =
     Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
     Math.cos(lat1) *
-      Math.cos(lat2) *
-      Math.sin(deltaLng / 2) *
-      Math.sin(deltaLng / 2);
+    Math.cos(lat2) *
+    Math.sin(deltaLng / 2) *
+    Math.sin(deltaLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return earthRadiusKm * c;
@@ -375,18 +407,18 @@ function isPositionInsideBounds(position) {
 
 function getGeolocationErrorMessage(error) {
   if (error?.code === error?.PERMISSION_DENIED) {
-    return 'Izin lokasi ditolak. Aktifkan izin lokasi browser untuk memakai posisi perangkat.';
+    return 'Izin lokasi ditolak. Aktifkan GPS dan izin lokasi browser untuk menghitung jarak dari posisi anda.';
   }
 
   if (error?.code === error?.POSITION_UNAVAILABLE) {
-    return 'Lokasi perangkat belum tersedia. Jarak memakai lokasi contoh.';
+    return 'Lokasi perangkat belum tersedia. Pastikan GPS aktif lalu coba lagi.';
   }
 
   if (error?.code === error?.TIMEOUT) {
-    return 'Pencarian lokasi terlalu lama. Jarak memakai lokasi contoh.';
+    return 'Pencarian lokasi terlalu lama. Pastikan GPS aktif lalu coba lagi.';
   }
 
-  return 'Lokasi perangkat belum dapat digunakan. Jarak memakai lokasi contoh.';
+  return 'Lokasi perangkat belum dapat digunakan. Aktifkan GPS untuk menghitung jarak.';
 }
 
 function formatRating(value) {
@@ -398,6 +430,14 @@ function formatRating(value) {
 
 function formatReviewCount(value) {
   return new Intl.NumberFormat('id-ID').format(Number(value || 0));
+}
+
+function parseRatingInput(value) {
+  const rating = Number(String(value || '').replace(',', '.'));
+
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) return null;
+
+  return Math.round(rating * 10) / 10;
 }
 
 function getNewestSortValue(item) {
@@ -414,6 +454,45 @@ function listFromText(value) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function getWisataAddFormIssues(form, position) {
+  const issues = getEmptyFieldIssues([
+    { key: 'nama_wisata', label: 'Nama Wisata', value: form.nama_wisata },
+    { key: 'jenis_wisata', label: 'Kategori', value: form.jenis_wisata },
+    { key: 'desa_kelurahan', label: 'Desa/Kelurahan', value: form.desa_kelurahan },
+    { key: 'kecamatan', label: 'Kecamatan', value: form.kecamatan },
+    { key: 'kabupaten_kota', label: 'Kab/Kota', value: form.kabupaten_kota },
+    { key: 'provinsi', label: 'Provinsi', value: form.provinsi },
+  ]);
+  const selectedFacilities = listFromText(form.fasilitas);
+
+  if (selectedFacilities.length === 0) {
+    issues.push({ key: 'fasilitas', label: 'Fasilitas' });
+  }
+
+  const latitudeText = String(form.latitude || '').trim();
+  const longitudeText = String(form.longitude || '').trim();
+
+  if (!latitudeText && !longitudeText) {
+    issues.push({
+      key: 'coordinates',
+      label: 'Titik lokasi pada peta (klik peta atau isi latitude & longitude)',
+    });
+  } else if (!position) {
+    if (!latitudeText) {
+      issues.push({ key: 'latitude', label: 'Latitude' });
+    } else if (!longitudeText) {
+      issues.push({ key: 'longitude', label: 'Longitude' });
+    } else {
+      issues.push({
+        key: 'coordinates',
+        label: 'Koordinat valid (periksa format latitude/longitude)',
+      });
+    }
+  }
+
+  return issues;
 }
 
 function getWisataFormValues(item) {
@@ -575,10 +654,12 @@ export default function WisataMapPage({ readOnly = false }) {
   const { user } = useAuth();
   const mapCardRef = useRef(null);
   const listCardRef = useRef(null);
+  const addFormPanelRef = useRef(null);
   const focusKeyRef = useRef(0);
+  const geolocationRequestRef = useRef(0);
+  const currentLocationRef = useRef(null);
   const [wisata, setWisata] = useState([]);
-  const [currentLocation, setCurrentLocation] = useState(CURRENT_LOCATION_FALLBACK);
-  const [currentLocationSource, setCurrentLocationSource] = useState('contoh');
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [category, setCategory] = useState('semua');
   const [distance, setDistance] = useState('semua');
   const [selectedFacilities, setSelectedFacilities] = useState([]);
@@ -591,16 +672,28 @@ export default function WisataMapPage({ readOnly = false }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingWisata, setEditingWisata] = useState(null);
   const [addForm, setAddForm] = useState(ADD_WISATA_INITIAL_FORM);
+  const [placeSearchQuery, setPlaceSearchQuery] = useState('');
+  const [placeSearchResults, setPlaceSearchResults] = useState([]);
+  const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
   const [mapFocusTarget, setMapFocusTarget] = useState(null);
   const [showAllWisata, setShowAllWisata] = useState(false);
   const [locationStatus, setLocationStatus] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [missingFieldKeys, setMissingFieldKeys] = useState(() => new Set());
+  const [ratingForms, setRatingForms] = useState({});
+  const [ratingSavingId, setRatingSavingId] = useState(null);
   const canManageWisata = !readOnly && ['wisata', 'pengurus'].includes(user?.role);
+  const canRateWisata = readOnly && user?.role === 'masyarakat';
+  const showCurrentLocationMarker = Boolean(currentLocation);
   const createMapFocusKey = (prefix) => {
     focusKeyRef.current += 1;
     return `${prefix}-${focusKeyRef.current}`;
   };
+
+  useEffect(() => {
+    currentLocationRef.current = currentLocation;
+  }, [currentLocation]);
 
   const loadWisata = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -698,10 +791,12 @@ export default function WisataMapPage({ readOnly = false }) {
   }, [category, distance, enrichedWisata, selectedFacilities]);
 
   const nearestWisata = useMemo(() => {
+    if (!currentLocation) return [];
+
     return [...filteredWisata]
       .sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0))
       .slice(0, 3);
-  }, [filteredWisata]);
+  }, [currentLocation, filteredWisata]);
 
   const displayedWisata = useMemo(() => {
     const nextWisata = [...filteredWisata];
@@ -814,21 +909,26 @@ export default function WisataMapPage({ readOnly = false }) {
     });
   };
 
-  const applyFallbackLocation = (statusText) => {
-    setCurrentLocation(CURRENT_LOCATION_FALLBACK);
-    setCurrentLocationSource('contoh');
-    setMapFocusTarget({
-      position: CURRENT_LOCATION_FALLBACK,
-      zoom: FOCUS_MAP_ZOOM,
-      key: createMapFocusKey('fallback-location'),
-    });
+  const applyLocationError = (statusText, requestId) => {
+    if (requestId && requestId !== geolocationRequestRef.current) return;
+
+    if (currentLocationRef.current) {
+      setLocationStatus('Lokasi perangkat berhasil digunakan.');
+      setError('');
+      setIsLocating(false);
+      return;
+    }
+
+    setCurrentLocation(null);
     setLocationStatus(statusText);
-    setMessage(statusText);
+    setError(statusText);
     setIsLocating(false);
-    scrollMapIntoView();
   };
 
   const handleUseBrowserLocation = () => {
+    const requestId = geolocationRequestRef.current + 1;
+    geolocationRequestRef.current = requestId;
+
     setIsLocating(true);
     setError('');
     setLocationStatus('Mendeteksi lokasi perangkat...');
@@ -837,31 +937,33 @@ export default function WisataMapPage({ readOnly = false }) {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       const statusText =
         typeof window !== 'undefined' && !window.isSecureContext
-          ? 'Lokasi otomatis hanya tersedia di HTTPS atau localhost. Jarak memakai lokasi contoh.'
-          : 'Browser belum mendukung lokasi otomatis. Jarak memakai lokasi contoh.';
-      applyFallbackLocation(statusText);
+          ? 'Lokasi otomatis hanya tersedia di HTTPS atau localhost. Aktifkan GPS melalui browser yang mendukung lokasi.'
+          : 'Browser belum mendukung lokasi otomatis. Gunakan browser yang mendukung GPS.';
+      applyLocationError(statusText, requestId);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (requestId !== geolocationRequestRef.current) return;
+
         const nextLocation = [
           Number(position.coords.latitude),
           Number(position.coords.longitude),
         ];
 
         if (!Number.isFinite(nextLocation[0]) || !Number.isFinite(nextLocation[1])) {
-          applyFallbackLocation('Koordinat lokasi perangkat tidak valid. Jarak memakai lokasi contoh.');
+          applyLocationError('Koordinat lokasi perangkat tidak valid. Coba aktifkan GPS ulang.', requestId);
           return;
         }
 
         if (!isPositionInsideBounds(nextLocation)) {
-          applyFallbackLocation('Lokasi perangkat berada di luar area peta Indonesia. Jarak memakai lokasi contoh.');
+          applyLocationError('Lokasi perangkat berada di luar area peta Indonesia.', requestId);
           return;
         }
 
         setCurrentLocation(nextLocation);
-        setCurrentLocationSource('browser');
+        currentLocationRef.current = nextLocation;
         setMapFocusTarget({
           position: nextLocation,
           zoom: FOCUS_MAP_ZOOM,
@@ -869,11 +971,12 @@ export default function WisataMapPage({ readOnly = false }) {
         });
         setLocationStatus('Lokasi perangkat berhasil digunakan.');
         setMessage('Lokasi saat ini berhasil digunakan sebagai patokan jarak.');
+        setError('');
         setIsLocating(false);
         scrollMapIntoView();
       },
       (locationError) => {
-        applyFallbackLocation(getGeolocationErrorMessage(locationError));
+        applyLocationError(getGeolocationErrorMessage(locationError), requestId);
       },
       {
         enableHighAccuracy: true,
@@ -915,11 +1018,139 @@ export default function WisataMapPage({ readOnly = false }) {
     });
   };
 
+  const clearMissingField = (field) => {
+    setMissingFieldKeys((current) => {
+      const next = new Set(current);
+      next.delete(field);
+
+      if (field === 'latitude' || field === 'longitude') {
+        next.delete('coordinates');
+      }
+
+      return next;
+    });
+  };
+
   const handleAddFormChange = (field, value) => {
     setAddForm((current) => ({
       ...current,
       [field]: value,
     }));
+    clearMissingField(field);
+    setError('');
+  };
+
+  const isMissingField = (key) => missingFieldKeys.has(key);
+
+  const handleSearchPlace = async () => {
+    const query = placeSearchQuery.trim();
+
+    if (!query) {
+      setPlaceSearchResults([]);
+      setError('Masukkan patokan lokasi terlebih dahulu.');
+      return;
+    }
+
+    setPlaceSearchLoading(true);
+    setError('');
+
+    try {
+      const params = new URLSearchParams({
+        q: `${query}, Indonesia`,
+        format: 'json',
+        addressdetails: '1',
+        namedetails: '1',
+        limit: '5',
+        countrycodes: 'id',
+      });
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+      );
+
+      if (!response.ok) {
+        throw new Error('Pencarian lokasi gagal.');
+      }
+
+      const results = await response.json();
+      const nextResults = Array.isArray(results)
+        ? results
+          .map((item) => {
+            const latitude = Number(item.lat);
+            const longitude = Number(item.lon);
+
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+              return null;
+            }
+
+            return {
+              id: item.place_id || `${latitude}-${longitude}`,
+              name: getPlaceResultName(item),
+              displayName: item.display_name,
+              address: item.address || {},
+              position: [latitude, longitude],
+            };
+          })
+          .filter(Boolean)
+        : [];
+
+      setPlaceSearchResults(nextResults);
+
+      if (nextResults.length === 0) {
+        setError('Patokan lokasi tidak ditemukan. Coba nama tempat yang lebih spesifik.');
+      }
+    } catch (err) {
+      setPlaceSearchResults([]);
+      setError(err.message || 'Gagal mencari patokan lokasi.');
+    } finally {
+      setPlaceSearchLoading(false);
+    }
+  };
+
+  const handleSelectPlace = (place) => {
+    const address = place.address || {};
+    const [latitude, longitude] = place.position;
+    const city = address.city || address.town || address.county || address.regency || '';
+    const streetLine = [address.house_number, address.road || address.pedestrian]
+      .filter(Boolean)
+      .join(' ');
+
+    setAddForm((current) => ({
+      ...current,
+      // Patokan lokasi hanya untuk navigasi peta; jangan isi alamat dengan nama pencarian.
+      alamat: streetLine || current.alamat,
+      desa_kelurahan:
+        address.village ||
+        address.suburb ||
+        address.neighbourhood ||
+        current.desa_kelurahan,
+      kecamatan: address.district || address.subdistrict || current.kecamatan,
+      kabupaten_kota: city || current.kabupaten_kota,
+      provinsi: address.state || current.provinsi,
+      latitude: latitude.toFixed(6),
+      longitude: longitude.toFixed(6),
+    }));
+    setPlaceSearchQuery(place.name || '');
+    setPlaceSearchResults([]);
+    setMissingFieldKeys((current) => {
+      const next = new Set(current);
+      [
+        'desa_kelurahan',
+        'kecamatan',
+        'kabupaten_kota',
+        'provinsi',
+        'latitude',
+        'longitude',
+        'coordinates',
+      ].forEach((key) => next.delete(key));
+      return next;
+    });
+    setMapFocusTarget({
+      position: place.position,
+      zoom: SELECTED_PLACE_ZOOM,
+      key: createMapFocusKey('search-place'),
+    });
+    setMessage('Map diarahkan ke patokan lokasi yang dipilih.');
+    scrollMapIntoView();
   };
 
   const handleAddFacilityToggle = (facility) => {
@@ -933,16 +1164,16 @@ export default function WisataMapPage({ readOnly = false }) {
 
     const nextFacilities = selectedAddFacilityNames.has(facility.toLowerCase())
       ? FACILITY_OPTIONS.filter(
-          (item) =>
-            selectedAddFacilityNames.has(item.toLowerCase()) &&
-            item.toLowerCase() !== facility.toLowerCase(),
-        )
+        (item) =>
+          selectedAddFacilityNames.has(item.toLowerCase()) &&
+          item.toLowerCase() !== facility.toLowerCase(),
+      )
       : [
-          ...FACILITY_OPTIONS.filter((item) =>
-            selectedAddFacilityNames.has(item.toLowerCase()),
-          ),
-          facility,
-        ];
+        ...FACILITY_OPTIONS.filter((item) =>
+          selectedAddFacilityNames.has(item.toLowerCase()),
+        ),
+        facility,
+      ];
 
     handleAddFormChange('fasilitas', nextFacilities.join(', '));
   };
@@ -953,14 +1184,33 @@ export default function WisataMapPage({ readOnly = false }) {
       latitude: latlng.lat.toFixed(6),
       longitude: latlng.lng.toFixed(6),
     }));
+    setMissingFieldKeys((current) => {
+      const next = new Set(current);
+      next.delete('coordinates');
+      next.delete('latitude');
+      next.delete('longitude');
+      return next;
+    });
     setMessage('Titik lokasi wisata dipilih dari peta.');
+  };
+
+  const handleClearAddLocation = () => {
+    setAddForm((current) => ({
+      ...current,
+      latitude: '',
+      longitude: '',
+    }));
+    setMessage('Titik lokasi wisata dibatalkan.');
   };
 
   const handleOpenAddForm = () => {
     setEditingWisata(null);
     setAddForm(ADD_WISATA_INITIAL_FORM);
+    setPlaceSearchQuery('');
+    setPlaceSearchResults([]);
     setError('');
     setMessage('');
+    setMissingFieldKeys(new Set());
     setShowAddForm(true);
   };
 
@@ -969,6 +1219,8 @@ export default function WisataMapPage({ readOnly = false }) {
 
     setEditingWisata(item);
     setAddForm(getWisataFormValues(item));
+    setPlaceSearchQuery('');
+    setPlaceSearchResults([]);
     setError('');
     setMessage('');
     setShowAddForm(true);
@@ -978,21 +1230,30 @@ export default function WisataMapPage({ readOnly = false }) {
     setShowAddForm(false);
     setEditingWisata(null);
     setAddForm(ADD_WISATA_INITIAL_FORM);
+    setPlaceSearchQuery('');
+    setPlaceSearchResults([]);
+    setMissingFieldKeys(new Set());
   };
 
   const handleSubmitAddWisata = async (event) => {
     event.preventDefault();
-    setSaving(true);
     setError('');
     setMessage('');
 
-    try {
-      if (!addFormPosition) {
-        throw new Error(
-          'Latitude dan longitude belum valid. Gunakan format decimal, contoh -6.829512 dan 107.798604, atau format 70832.1 dan 1072354.7.',
-        );
-      }
+    const issues = getWisataAddFormIssues(addForm, addFormPosition);
 
+    if (issues.length > 0) {
+      setMissingFieldKeys(new Set(issues.map((issue) => issue.key)));
+      setError(formatFormValidationMessage(issues));
+      addFormPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToPageTop();
+      return;
+    }
+
+    setMissingFieldKeys(new Set());
+    setSaving(true);
+
+    try {
       const payload = {
         ...addForm,
         harga_tiket: addForm.harga_tiket === '' ? null : Number(addForm.harga_tiket),
@@ -1025,10 +1286,10 @@ export default function WisataMapPage({ readOnly = false }) {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.message ||
-          (editingWisata
-            ? 'Gagal memperbarui lokasi wisata.'
-            : 'Gagal menambahkan lokasi wisata.'),
+        err.message ||
+        (editingWisata
+          ? 'Gagal memperbarui lokasi wisata.'
+          : 'Gagal menambahkan lokasi wisata.'),
       );
     } finally {
       setSaving(false);
@@ -1060,6 +1321,75 @@ export default function WisataMapPage({ readOnly = false }) {
     }
   };
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      handleUseBrowserLocation();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+    // Peta wisata memakai GPS pengguna sebagai patokan jarak, jadi diminta saat halaman dibuka.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRatingFormChange = (id, field, value) => {
+    setRatingForms((current) => ({
+      ...current,
+      [id]: {
+        rating: '',
+        ulasan: '',
+        ...(current[id] || {}),
+        [field]: value,
+      },
+    }));
+    setError('');
+  };
+
+  const handleSubmitRating = async (event, item) => {
+    event.preventDefault();
+    if (!canRateWisata || item.isFallback) return;
+
+    const form = ratingForms[item.id] || {};
+    const rating = parseRatingInput(form.rating);
+
+    if (rating === null) {
+      setError('Rating harus diisi antara 1 sampai 5.');
+      return;
+    }
+
+    setRatingSavingId(item.id);
+    setError('');
+    setMessage('');
+
+    try {
+      const { data } = await wisataService.rate(item.id, {
+        rating,
+        ulasan: form.ulasan || '',
+      });
+      const updated = data.data;
+
+      if (updated) {
+        setWisata((current) =>
+          current.map((row) => {
+            const rowId = row.id || row.id_wisata;
+            return Number(rowId) === Number(item.id) ? updated : row;
+          }),
+        );
+      } else {
+        await loadWisata({ silent: true });
+      }
+
+      setRatingForms((current) => ({
+        ...current,
+        [item.id]: { rating: '', ulasan: '' },
+      }));
+      setMessage(data.message || 'Rating wisata berhasil disimpan.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal menyimpan rating wisata.');
+    } finally {
+      setRatingSavingId(null);
+    }
+  };
+
   return (
     <div className="wisata-page-shell">
       <header className="wisata-page-header">
@@ -1081,10 +1411,10 @@ export default function WisataMapPage({ readOnly = false }) {
       </header>
 
       {message && <div className="wisata-message is-info">{message}</div>}
-      {error && <div className="wisata-message is-error">{error}</div>}
+      {error && !showAddForm && <div className="wisata-message is-error">{error}</div>}
 
       {showAddForm && (
-        <section className="wisata-add-panel">
+        <section className="wisata-add-panel" ref={addFormPanelRef}>
           <div className="wisata-add-panel-header">
             <div>
               <h2>{editingWisata ? 'Edit Lokasi Wisata' : 'Tambah Lokasi Wisata'}</h2>
@@ -1099,41 +1429,33 @@ export default function WisataMapPage({ readOnly = false }) {
             </button>
           </div>
 
-          <form onSubmit={handleSubmitAddWisata} className="wisata-add-form">
-            <label>
-              Nama Wisata <strong>*</strong>
+          <form onSubmit={handleSubmitAddWisata} className="wisata-add-form" noValidate>
+            {error && (
+              <div className="wisata-form-validation-error" role="alert">
+                {error}
+              </div>
+            )}
+
+            <label className={isMissingField('nama_wisata') ? 'wisata-field-missing' : undefined}>
+              <span className="wisata-required-label">Nama Wisata</span>
               <input
                 value={addForm.nama_wisata}
                 onChange={(event) => handleAddFormChange('nama_wisata', event.target.value)}
                 placeholder="Contoh: Wisata Alam Cipacet"
-                required
               />
             </label>
 
-            <div className="wisata-add-form-grid three">
-              <label>
-                Kategori
+            <div className="wisata-add-form-grid">
+              <label className={isMissingField('jenis_wisata') ? 'wisata-field-missing' : undefined}>
+                <span className="wisata-required-label">Kategori</span>
                 <select
                   value={addForm.jenis_wisata}
                   onChange={(event) => handleAddFormChange('jenis_wisata', event.target.value)}
                 >
+                  <option value="">Pilih kategori</option>
                   <option value="Alam">Alam</option>
                   <option value="Buatan">Buatan</option>
                   <option value="Budaya">Budaya</option>
-                </select>
-              </label>
-
-              <label>
-                Status Wisata
-                <select
-                  value={addForm.status}
-                  onChange={(event) => handleAddFormChange('status', event.target.value)}
-                >
-                  {WISATA_STATUS_OPTIONS.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
                 </select>
               </label>
 
@@ -1149,18 +1471,57 @@ export default function WisataMapPage({ readOnly = false }) {
               </label>
             </div>
 
+            <div className="wisata-place-search-field">
+              <label htmlFor="wisata-place-search">Patokan Lokasi</label>
+              <div className="wisata-place-search-row">
+                <input
+                  id="wisata-place-search"
+                  value={placeSearchQuery}
+                  onChange={(event) => setPlaceSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleSearchPlace();
+                    }
+                  }}
+                  placeholder="Cari patokan tempat, desa, atau jalan"
+                />
+                <button
+                  type="button"
+                  onClick={handleSearchPlace}
+                  disabled={placeSearchLoading}
+                >
+                  {placeSearchLoading ? '...' : 'Cari'}
+                </button>
+              </div>
+
+              {placeSearchResults.length > 0 && (
+                <div className="wisata-place-results">
+                  {placeSearchResults.map((place) => (
+                    <button
+                      type="button"
+                      key={place.id}
+                      onClick={() => handleSelectPlace(place)}
+                    >
+                      {place.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <label>
-              Alamat / Patokan
+              Alamat / Detail Lokasi
               <input
                 value={addForm.alamat}
                 onChange={(event) => handleAddFormChange('alamat', event.target.value)}
-                placeholder="Contoh: Cijambu, Tanjungsari"
+                placeholder="Contoh: Jalan Braga No. 12 (opsional)"
               />
             </label>
 
             <div className="wisata-add-form-grid four">
-              <label>
-                Desa/Kelurahan
+              <label className={isMissingField('desa_kelurahan') ? 'wisata-field-missing' : undefined}>
+                <span className="wisata-required-label">Desa/Kelurahan</span>
                 <input
                   value={addForm.desa_kelurahan}
                   onChange={(event) => handleAddFormChange('desa_kelurahan', event.target.value)}
@@ -1168,8 +1529,8 @@ export default function WisataMapPage({ readOnly = false }) {
                 />
               </label>
 
-              <label>
-                Kecamatan
+              <label className={isMissingField('kecamatan') ? 'wisata-field-missing' : undefined}>
+                <span className="wisata-required-label">Kecamatan</span>
                 <input
                   value={addForm.kecamatan}
                   onChange={(event) => handleAddFormChange('kecamatan', event.target.value)}
@@ -1177,8 +1538,8 @@ export default function WisataMapPage({ readOnly = false }) {
                 />
               </label>
 
-              <label>
-                Kab/Kota
+              <label className={isMissingField('kabupaten_kota') ? 'wisata-field-missing' : undefined}>
+                <span className="wisata-required-label">Kab/Kota</span>
                 <input
                   value={addForm.kabupaten_kota}
                   onChange={(event) => handleAddFormChange('kabupaten_kota', event.target.value)}
@@ -1186,8 +1547,8 @@ export default function WisataMapPage({ readOnly = false }) {
                 />
               </label>
 
-              <label>
-                Provinsi
+              <label className={isMissingField('provinsi') ? 'wisata-field-missing' : undefined}>
+                <span className="wisata-required-label">Provinsi</span>
                 <input
                   value={addForm.provinsi}
                   onChange={(event) => handleAddFormChange('provinsi', event.target.value)}
@@ -1197,32 +1558,30 @@ export default function WisataMapPage({ readOnly = false }) {
             </div>
 
             <div className="wisata-add-form-grid">
-              <label>
-                Latitude <strong>*</strong>
+              <label className={isMissingField('latitude') || isMissingField('coordinates') ? 'wisata-field-missing' : undefined}>
+                <span className="wisata-required-label">Latitude</span>
                 <input
                   type="number"
                   step="any"
                   value={addForm.latitude}
                   onChange={(event) => handleAddFormChange('latitude', event.target.value)}
                   placeholder="-6.829512"
-                  required
                 />
               </label>
 
-              <label>
-                Longitude <strong>*</strong>
+              <label className={isMissingField('longitude') || isMissingField('coordinates') ? 'wisata-field-missing' : undefined}>
+                <span className="wisata-required-label">Longitude</span>
                 <input
                   type="number"
                   step="any"
                   value={addForm.longitude}
                   onChange={(event) => handleAddFormChange('longitude', event.target.value)}
                   placeholder="107.798604"
-                  required
                 />
               </label>
             </div>
 
-            <p className="wisata-add-map-hint">
+            <p className={`wisata-add-map-hint${isMissingField('coordinates') ? ' wisata-field-missing-hint' : ''}`}>
               Klik area pada peta di bawah untuk mengisi titik latitude dan longitude secara otomatis.
               Jika mengetik manual, titik akan dibuat otomatis setelah koordinat valid.
             </p>
@@ -1241,8 +1600,12 @@ export default function WisataMapPage({ readOnly = false }) {
               </p>
             )}
 
-            <fieldset className="wisata-add-facilities">
-              <legend>Fasilitas</legend>
+            <fieldset
+              className={`wisata-add-facilities${isMissingField('fasilitas') ? ' wisata-fieldset-missing' : ''}`}
+            >
+              <legend>
+                <span className="wisata-required-label">Fasilitas</span>
+              </legend>
               <label>
                 <input
                   type="checkbox"
@@ -1403,7 +1766,7 @@ export default function WisataMapPage({ readOnly = false }) {
                 );
               })}
 
-              {currentLocation && (
+              {showCurrentLocationMarker && (
                 <Marker position={currentLocation} icon={createCurrentLocationIcon()}>
                   <Tooltip
                     permanent
@@ -1412,16 +1775,12 @@ export default function WisataMapPage({ readOnly = false }) {
                     opacity={1}
                     className="wisata-current-location-label"
                   >
-                    Lokasi Saat Ini
+                    Lokasi Saya
                   </Tooltip>
                   <Popup>
                     <div className="wisata-current-popup">
-                      <strong>Lokasi Saat Ini</strong>
-                      <span>
-                        {currentLocationSource === 'browser'
-                          ? 'Patokan jarak memakai lokasi perangkat.'
-                          : 'Patokan jarak memakai lokasi contoh.'}
-                      </span>
+                      <strong>Lokasi Saya</strong>
+                      <span>Patokan jarak memakai lokasi perangkat.</span>
                     </div>
                   </Popup>
                 </Marker>
@@ -1429,8 +1788,19 @@ export default function WisataMapPage({ readOnly = false }) {
 
               {showAddForm && addFormPosition && (
                 <Marker position={addFormPosition}>
-                  <Popup>
-                    {editingWisata ? 'Titik lokasi wisata diperbarui' : 'Lokasi wisata baru'}
+                  <Popup closeButton>
+                    <div className="wisata-draft-location-popup">
+                      <strong>Lokasi yang dipilih</strong>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleClearAddLocation();
+                        }}
+                      >
+                        Hapus lokasi
+                      </button>
+                    </div>
                   </Popup>
                 </Marker>
               )}
@@ -1500,76 +1870,113 @@ export default function WisataMapPage({ readOnly = false }) {
               </div>
             </div>
 
-            <div className={`wisata-card-grid ${showAllWisata ? 'is-expanded' : ''}`}>
-              {visibleWisataCards.map((item) => {
-                const config = getCategoryConfig(item.category);
+            <div className={`wisata-card-scroll ${showAllWisata ? 'is-expanded' : ''}`}>
+              <div className={`wisata-card-grid ${showAllWisata ? 'is-expanded' : ''}`}>
+                {visibleWisataCards.map((item) => {
+                  const config = getCategoryConfig(item.category);
 
-                return (
-                  <article className="wisata-location-card" key={item.id}>
-                    <button
-                      type="button"
-                      className="wisata-card-image-button"
-                      onClick={() => handleFocusWisataOnMap(item)}
-                      aria-label={`Fokuskan peta ke ${item.name}`}
-                    >
-                      <img src={item.image} alt="" />
-                    </button>
-                    <div>
-                      <span style={{ backgroundColor: config.bg, color: config.color }}>
-                        {config.label}
-                      </span>
-                      {isNewlyOpenedStatus(item.status) && (
-                        <span className="wisata-card-status-badge">
-                          {getWisataStatusLabel(item.status)}
+                  return (
+                    <article className="wisata-location-card" key={item.id}>
+                      <button
+                        type="button"
+                        className="wisata-card-image-button"
+                        onClick={() => handleFocusWisataOnMap(item)}
+                        aria-label={`Fokuskan peta ke ${item.name}`}
+                      >
+                        <img src={item.image} alt="" />
+                      </button>
+                      <div>
+                        <span style={{ backgroundColor: config.bg, color: config.color }}>
+                          {config.label}
                         </span>
-                      )}
-                      <h3>{item.name}</h3>
-                      <p>{item.location}</p>
-                      <p className="wisata-card-distance">
-                        Jarak dari lokasi saat ini: <span>{formatDistance(item.distanceKm)}</span>
-                      </p>
-                      <strong>
-                        <WisataIcon name="star" size={15} />
-                        {formatRating(item.rating)} ({formatReviewCount(item.reviews)})
-                      </strong>
-                      {canManageWisata && !item.isFallback && (
-                        <div className="wisata-card-actions">
-                          <button
-                            type="button"
-                            className="wisata-edit-button"
-                            onClick={() => handleStartEditWisata(item)}
+                        {isNewlyOpenedStatus(item.status) && (
+                          <span className="wisata-card-status-badge">
+                            {getWisataStatusLabel(item.status)}
+                          </span>
+                        )}
+                        <h3>{item.name}</h3>
+                        <p>{item.location}</p>
+                        <p className="wisata-card-distance">
+                          Jarak dari lokasi saat ini: <span>{formatDistance(item.distanceKm)}</span>
+                        </p>
+                        <strong>
+                          <WisataIcon name="star" size={15} />
+                          {formatRating(item.rating)} ({formatReviewCount(item.reviews)})
+                        </strong>
+                        {canRateWisata && !item.isFallback && (
+                          <form
+                            className="wisata-rating-form"
+                            onSubmit={(event) => handleSubmitRating(event, item)}
                           >
-                            <WisataIcon name="edit" size={14} />
-                            Edit Lokasi
-                          </button>
-                          <button
-                            type="button"
-                            className="wisata-delete-button"
-                            disabled={deletingId === item.id}
-                            onClick={() => handleDeleteWisata(item)}
-                          >
-                            <WisataIcon name="trash" size={14} />
-                            {deletingId === item.id ? 'Menghapus...' : 'Hapus Lokasi'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-
-              {!showAllWisata && (
-                <button
-                  type="button"
-                  className="wisata-see-all-card"
-                  onClick={handleViewAllWisata}
-                >
-                  <WisataIcon name="plus" size={28} />
-                  <span>Lihat Semua</span>
-                  <small>{displayedWisata.length} lokasi</small>
-                </button>
-              )}
+                            <label>
+                              Rating anda
+                              <select
+                                value={ratingForms[item.id]?.rating || ''}
+                                onChange={(event) =>
+                                  handleRatingFormChange(item.id, 'rating', event.target.value)
+                                }
+                              >
+                                <option value="">Pilih rating</option>
+                                <option value="5">5 - Sangat baik</option>
+                                <option value="4">4 - Baik</option>
+                                <option value="3">3 - Cukup</option>
+                                <option value="2">2 - Kurang</option>
+                                <option value="1">1 - Buruk</option>
+                              </select>
+                            </label>
+                            <label>
+                              Ulasan
+                              <textarea
+                                value={ratingForms[item.id]?.ulasan || ''}
+                                onChange={(event) =>
+                                  handleRatingFormChange(item.id, 'ulasan', event.target.value)
+                                }
+                                placeholder="Tulis ulasan singkat..."
+                              />
+                            </label>
+                            <button type="submit" disabled={ratingSavingId === item.id}>
+                              {ratingSavingId === item.id ? 'Menyimpan...' : 'Kirim Rating'}
+                            </button>
+                          </form>
+                        )}
+                        {canManageWisata && !item.isFallback && (
+                          <div className="wisata-card-actions">
+                            <button
+                              type="button"
+                              className="wisata-edit-button"
+                              onClick={() => handleStartEditWisata(item)}
+                            >
+                              <WisataIcon name="edit" size={14} />
+                              Edit Lokasi
+                            </button>
+                            <button
+                              type="button"
+                              className="wisata-delete-button"
+                              disabled={deletingId === item.id}
+                              onClick={() => handleDeleteWisata(item)}
+                            >
+                              <WisataIcon name="trash" size={14} />
+                              {deletingId === item.id ? 'Menghapus...' : 'Hapus Lokasi'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
             </div>
+
+            {!showAllWisata && displayedWisata.length > visibleWisataCards.length && (
+              <button
+                type="button"
+                className="wisata-show-all-btn"
+                onClick={handleViewAllWisata}
+              >
+                <WisataIcon name="plus" size={16} />
+                Tampilkan Semua {displayedWisata.length} Lokasi Wisata
+              </button>
+            )}
           </section>
 
           <section className="wisata-summary-section">
@@ -1664,21 +2071,25 @@ export default function WisataMapPage({ readOnly = false }) {
           <section className="wisata-nearest-card">
             <h2>Lokasi Terdekat</h2>
             <p className="wisata-nearest-note">
-              Dihitung dari{' '}
-              {currentLocationSource === 'browser'
-                ? 'lokasi perangkat saat ini'
-                : 'lokasi contoh saat ini'}
-              .
+              {currentLocation
+                ? 'Dihitung dari lokasi perangkat saat ini.'
+                : 'Aktifkan GPS dan beri izin lokasi browser untuk melihat jarak terdekat.'}
             </p>
 
-            <ol>
-              {nearestWisata.map((item) => (
-                <li key={item.id}>
-                  <span>{item.name}</span>
-                  <strong>{formatDistance(item.distanceKm)}</strong>
-                </li>
-              ))}
-            </ol>
+            {nearestWisata.length > 0 ? (
+              <ol>
+                {nearestWisata.map((item) => (
+                  <li key={item.id}>
+                    <span>{item.name}</span>
+                    <strong>{formatDistance(item.distanceKm)}</strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="wisata-nearest-empty">
+                Jarak belum tersedia karena GPS belum aktif.
+              </p>
+            )}
 
             <button type="button" onClick={handleViewAllWisata}>
               Lihat Semua Lokasi

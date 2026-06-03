@@ -61,6 +61,23 @@ function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isDateInCurrentMonth(value) {
+  if (!value) return false;
+
+  const date = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) return false;
+
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), 1);
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  return date >= start && date <= end;
+}
+
 const INDONESIAN_PROVINCES = [
   'aceh',
   'sumatera utara',
@@ -396,6 +413,12 @@ router.post('/', async (req, res) => {
       });
     }
 
+    if (!isDateInCurrentMonth(tanggalKunjungan)) {
+      return res.status(400).json({
+        message: 'Tanggal laporan hanya boleh diisi untuk bulan berjalan.',
+      });
+    }
+
     if (!(await ensureWisataExists(idWisata))) {
       return res.status(404).json({
         message: 'Data wisata tidak ditemukan.',
@@ -459,6 +482,12 @@ router.put('/:id', async (req, res) => {
     }
 
     if (req.body.tanggal_kunjungan !== undefined) {
+      if (!isDateInCurrentMonth(req.body.tanggal_kunjungan)) {
+        return res.status(400).json({
+          message: 'Tanggal laporan hanya boleh diisi untuk bulan berjalan.',
+        });
+      }
+
       nextData.tanggal_kunjungan = req.body.tanggal_kunjungan;
     }
 

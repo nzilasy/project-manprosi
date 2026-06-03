@@ -135,6 +135,65 @@ async function findAccessibleLahan(req, idLahan) {
   });
 }
 
+// GET /api/panen/public-summary — public endpoint for landing page charts
+router.get('/public-summary', async (req, res) => {
+  try {
+    const sequelize = require('../config/db');
+
+    // Production by commodity
+    const [byCommodity] = await sequelize.query(`
+      SELECT
+        k.nama_komoditas AS commodity,
+        COUNT(p.id_panen) AS harvest_count,
+        COALESCE(SUM(p.jumlah), 0) AS total_production,
+        COALESCE(AVG(p.jumlah), 0) AS avg_production
+      FROM panen p
+      LEFT JOIN komoditas k ON p.id_komoditas = k.id_komoditas
+      GROUP BY k.nama_komoditas
+      ORDER BY total_production DESC
+      LIMIT 10
+    `);
+
+    // Production by year
+    const [byYear] = await sequelize.query(`
+      SELECT
+        YEAR(p.tanggal_panen) AS year,
+        COUNT(p.id_panen) AS harvest_count,
+        COALESCE(SUM(p.jumlah), 0) AS total_production
+      FROM panen p
+      WHERE p.tanggal_panen IS NOT NULL
+      GROUP BY YEAR(p.tanggal_panen)
+      ORDER BY year ASC
+      LIMIT 10
+    `);
+
+    // Total summary
+    const [totals] = await sequelize.query(`
+      SELECT
+        COUNT(p.id_panen) AS total_harvests,
+        COALESCE(SUM(p.jumlah), 0) AS total_production,
+        COUNT(DISTINCT p.id_komoditas) AS unique_commodities,
+        COUNT(DISTINCT p.id_lahan) AS unique_fields
+      FROM panen p
+    `);
+
+    return res.json({
+      data: {
+        by_commodity: byCommodity || [],
+        by_year: byYear || [],
+        totals: totals?.[0] || {},
+      },
+    });
+  } catch (error) {
+    console.error('Get public panen summary error:', error);
+
+    return res.status(500).json({
+      message: 'Gagal mengambil ringkasan panen publik.',
+      error: error.message,
+    });
+  }
+});
+
 router.use(protect);
 router.use(authorize('petani', 'pengurus'));
 
