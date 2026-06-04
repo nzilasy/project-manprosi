@@ -1,0 +1,99 @@
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+
+.searchable-select.disabled .searchable-select-control {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.searchable-select-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  background-color: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1e293b;
+  transition: all 0.2s;
+}
+
+.searchable-select-control:hover {
+  border-color: #94a3b8;
+}
+
+.searchable-select-arrow {
+  font-size: 10px;
+  color: #64748b;
+  transition: transform 0.2s;
+}
+
+.searchable-select-arrow.open {
+  transform: rotate(180deg);
+}
+
+.searchable-select-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  margin-top: 4px;
+  background-color: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 50;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.searchable-select-search {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  outline: none;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.searchable-select-search:focus {
+  background-color: #f8fafc;
+}
+
+.searchable-select-options {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.searchable-select-option {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #334155;
+  transition: background-color 0.2s;
+}
+
+.searchable-select-option:hover {
+  background-color: #f1f5f9;
+}
+
+.searchable-select-option.selected {
+  background-color: #e0f2fe;
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.searchable-select-no-results {
+  padding: 12px 14px;
+  color: #94a3b8;
+  font-size: 14px;
+  text-align: center;
+}

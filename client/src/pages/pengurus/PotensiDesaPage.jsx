@@ -20,16 +20,10 @@ const ESRI_ATTRIBUTION =
 
 const STATUS_CONFIG = {
   optimal: {
-    label: 'Aktif/Optimal',
+    label: 'Lahan Aktif',
     color: '#22b07d',
     bg: '#e8f8ef',
     icon: 'leaf',
-  },
-  kurang: {
-    label: 'Kurang Optimal',
-    color: '#f97316',
-    bg: '#fff3e8',
-    icon: 'warning',
   },
   belum: {
     label: 'Belum Dimanfaatkan',
@@ -259,10 +253,8 @@ function getPosition(item) {
 
 function getStatusKey(item) {
   const status = String(item?.status || 'aktif').toLowerCase();
-  const area = getAreaInHa(item);
 
   if (status.includes('non') || status.includes('belum')) return 'belum';
-  if (area > 0 && area < 1) return 'kurang';
   return 'optimal';
 }
 
@@ -304,7 +296,7 @@ function createMarkerIcon(item) {
   return L.divIcon({
     className: '',
     html: `
-      <span class="potensi-map-marker" style="color: ${status.color}; background: ${status.bg};">
+      <span class="potensi-map-marker" style="color: #ffffff; background: ${status.color}; border-color: ${status.bg};">
         ${markerSvg}
       </span>
     `,
@@ -382,6 +374,14 @@ function MapFocus({ items }) {
   return null;
 }
 
+function formatLocationText(text) {
+  if (!text) return 'Lokasi belum diisi';
+  if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(text)) {
+    return text.split(',').map(n => Number(n).toFixed(4)).join(', ');
+  }
+  return text;
+}
+
 function enrichPotensi(item) {
   const statusKey = getStatusKey(item);
   const iconKey = getIconKey(item);
@@ -393,7 +393,7 @@ function enrichPotensi(item) {
     areaHa: getAreaInHa(item),
     displayIconKey,
     iconKey,
-    locationText: item.lokasi_lahan || 'Lokasi belum diisi',
+    locationText: formatLocationText(item.lokasi_lahan),
     polygon: parsePolygon(item),
     position: getPosition(item),
     statusKey,
@@ -402,6 +402,7 @@ function enrichPotensi(item) {
 
 export default function PotensiDesaPage() {
   const [lahan, setLahan] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -435,10 +436,15 @@ export default function PotensiDesaPage() {
 
   const rawItems = lahan.length > 0 ? lahan : FALLBACK_POTENSI;
   const items = useMemo(() => rawItems.map(enrichPotensi), [rawItems]);
-  const visibleItems = items.slice(0, 3);
+  const visibleItems = useMemo(() => {
+    if (!searchTerm) return items;
+    return items.filter((item) =>
+      (item.nama_lahan || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.locationText || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [items, searchTerm]);
   const total = items.length;
   const optimal = items.filter((item) => item.statusKey === 'optimal').length;
-  const kurang = items.filter((item) => item.statusKey === 'kurang').length;
   const belum = items.filter((item) => item.statusKey === 'belum').length;
 
   const summaryCards = [
@@ -450,18 +456,11 @@ export default function PotensiDesaPage() {
       tone: 'green',
     },
     {
-      label: 'Aktif/Optimal',
+      label: 'Lahan Aktif',
       value: optimal,
       note: formatPercent(total ? (optimal / total) * 100 : 0),
       icon: 'check',
       tone: 'green',
-    },
-    {
-      label: 'Kurang Optimal',
-      value: kurang,
-      note: formatPercent(total ? (kurang / total) * 100 : 0),
-      icon: 'warning',
-      tone: 'orange',
     },
     {
       label: 'Belum Dimanfaatkan',
@@ -480,6 +479,23 @@ export default function PotensiDesaPage() {
       </header>
 
       {error && <div className="potensi-message">{error}</div>}
+
+      <section className="potensi-summary-section" style={{ marginBottom: '32px' }}>
+        <div className="potensi-summary-grid">
+          {summaryCards.map((card) => (
+            <article className="potensi-summary-card" key={card.label}>
+              <div className={`potensi-summary-icon ${card.tone}`}>
+                <PotensiIcon name={card.icon} />
+              </div>
+              <div>
+                <span>{card.label}</span>
+                <strong>{card.value}</strong>
+                <small>{card.note}</small>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="potensi-main-grid">
         <div className="potensi-map-section">
@@ -550,49 +566,47 @@ export default function PotensiDesaPage() {
         <aside className="potensi-list-card">
           <h2>Daftar Potensi Desa</h2>
 
-          <div className="potensi-list">
-            {visibleItems.map((item) => {
-              const status = STATUS_CONFIG[item.statusKey] || STATUS_CONFIG.optimal;
+          <div className="potensi-search">
+            <input
+              type="text"
+              placeholder="Cari potensi lahan..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
 
-              return (
-                <article className="potensi-list-item" key={item.id_lahan || item.nama_lahan}>
-                  <div
-                    className="potensi-list-icon"
-                    style={{ backgroundColor: status.bg, color: status.color }}
-                  >
-                    <PotensiIcon name={item.displayIconKey} />
-                  </div>
-                  <div>
-                    <strong>{item.nama_lahan}</strong>
-                    <span>{item.locationText}</span>
-                  </div>
-                  <small style={{ backgroundColor: status.bg, color: status.color }}>
-                    {item.statusKey === 'optimal' ? 'Aktif' : status.label}
-                  </small>
-                </article>
-              );
-            })}
+          <div className="potensi-list-wrap">
+            <div className="potensi-list">
+              {visibleItems.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0', fontSize: '13px' }}>Tidak ada data ditemukan.</div>
+              ) : (
+                visibleItems.map((item) => {
+                  const status = STATUS_CONFIG[item.statusKey] || STATUS_CONFIG.optimal;
+
+                  return (
+                    <article className="potensi-list-item" key={item.id_lahan || item.nama_lahan}>
+                      <div
+                        className="potensi-list-icon"
+                        style={{ backgroundColor: status.bg, color: status.color }}
+                      >
+                        <PotensiIcon name={item.displayIconKey} />
+                      </div>
+                      <div style={{ overflow: 'hidden' }}>
+                        <strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.nama_lahan}</strong>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          📍 {item.locationText}
+                        </span>
+                      </div>
+                      <small style={{ backgroundColor: status.bg, color: status.color, flexShrink: 0 }}>
+                        {item.statusKey === 'optimal' ? 'Aktif' : status.label}
+                      </small>
+                    </article>
+                  );
+                })
+              )}
+            </div>
           </div>
         </aside>
-      </section>
-
-      <section className="potensi-summary-section">
-        <h2>Ringkasan Potensi Desa</h2>
-
-        <div className="potensi-summary-grid">
-          {summaryCards.map((card) => (
-            <article className="potensi-summary-card" key={card.label}>
-              <div className={`potensi-summary-icon ${card.tone}`}>
-                <PotensiIcon name={card.icon} />
-              </div>
-              <div>
-                <span>{card.label}</span>
-                <strong>{card.value}</strong>
-                <small>{card.note}</small>
-              </div>
-            </article>
-          ))}
-        </div>
       </section>
     </div>
   );

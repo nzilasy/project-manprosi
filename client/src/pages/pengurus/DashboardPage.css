@@ -514,3 +514,87 @@
     bottom: 14px;
   }
 }
+
+.pengurus-analytics-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 36px;
+  align-items: start;
+  margin-bottom: 44px;
+}
+.pengurus-chart-section {
+  display: grid;
+  gap: 16px;
+}
+.pengurus-chart-card {
+  position: relative;
+  height: 330px;
+  padding: 24px 24px 12px 12px;
+  border: 1px solid #d9e3ec;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+  display: flex;
+  align-items: flex-end;
+}
+.pengurus-priority-section {
+  display: grid;
+  gap: 16px;
+}
+.pengurus-priority-card {
+  border: 1px solid #d9e3ec;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+  padding: 20px;
+  height: 330px;
+  display: flex;
+  flex-direction: column;
+}
+.pengurus-priority-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+.pengurus-priority-item {
+  border-bottom: 1px solid #edf2f7;
+  padding-bottom: 12px;
+}
+.pengurus-priority-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.pengurus-priority-link {
+  text-decoration: none;
+  display: block;
+}
+.pengurus-priority-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.pengurus-priority-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.pengurus-priority-badge.orange { background: #fff3df; color: #c47b30; }
+.pengurus-priority-badge.purple { background: #f5e7ff; color: #9b5fd4; }
+.pengurus-priority-badge.red { background: #feecec; color: #d94848; }
+.pengurus-priority-header small { color: #94a3b8; font-size: 11px; font-weight: 700; }
+.pengurus-priority-item h3 { margin: 0; font-size: 13px; color: #172033; font-weight: 800; }
+.pengurus-priority-item p { margin: 2px 0 0; font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pengurus-priority-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94a3b8; text-align: center; gap: 8px; }
+.pengurus-priority-empty svg { width: 32px; height: 32px; color: #cbd5e1; }
+.pengurus-priority-footer { margin-top: 16px; text-align: center; }
+.pengurus-action-link-alt { color: #315f4d; font-size: 12px; font-weight: 800; text-decoration: none; }
+@media (max-width: 1080px) { .pengurus-analytics-row { grid-template-columns: 1fr; } }
+

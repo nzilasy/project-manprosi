@@ -7,6 +7,9 @@ const WisataRating = sequelize.define('WisataRating', {
   id_user: { type: DataTypes.INTEGER, allowNull: false },
   rating: { type: DataTypes.DECIMAL(2, 1), allowNull: false },
   ulasan: { type: DataTypes.TEXT, allowNull: true },
+  balasan: { type: DataTypes.TEXT, allowNull: true },
+  balasan_by: { type: DataTypes.INTEGER, allowNull: true },
+  balasan_at: { type: DataTypes.DATE, allowNull: true },
 }, {
   tableName: 'wisata_rating',
   timestamps: true,

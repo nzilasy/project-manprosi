@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './PetaniLayout.css';
 
@@ -71,6 +71,11 @@ function LayoutIcon({ name }) {
         <path d="M15 18v2" />
       </svg>
     ),
+    star: (
+      <svg {...commonProps}>
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+    ),
   };
 
   return icons[name] || null;
@@ -79,9 +84,12 @@ function LayoutIcon({ name }) {
 export default function PetaniLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [showSidebar, setShowSidebar] = useState(true);
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showWisataMenu, setShowWisataMenu] = useState(
+    location.pathname.startsWith('/petani/wisata') || location.pathname.startsWith('/petani/ulasan')
+  );
 
   const userName =
     user?.name ||
@@ -92,8 +100,6 @@ export default function PetaniLayout() {
   const userRole = user?.role || 'petani';
 
   const handleLogout = () => {
-    setShowUserMenu(false);
-
     if (typeof logout === 'function') {
       logout();
     } else {
@@ -102,6 +108,10 @@ export default function PetaniLayout() {
     }
 
     navigate('/login');
+  };
+
+  const handleProfileClick = () => {
+    navigate('/profile');
   };
 
   return (
@@ -120,7 +130,8 @@ export default function PetaniLayout() {
           <button
             type="button"
             className="petani-user-button"
-            onClick={() => setShowUserMenu((previous) => !previous)}
+            onClick={handleProfileClick}
+            title="Lihat Profil"
           >
             <span className="petani-user-icon">
               <LayoutIcon name="user" />
@@ -129,19 +140,6 @@ export default function PetaniLayout() {
             <span>•</span>
             <span className="petani-user-role">{userRole}</span>
           </button>
-
-          {showUserMenu && (
-            <div className="petani-user-dropdown">
-              <div className="petani-user-dropdown-header">
-                <strong>{userName}</strong>
-                <span>{userRole}</span>
-              </div>
-
-              <button type="button" onClick={handleLogout}>
-                Keluar dari akun
-              </button>
-            </div>
-          )}
         </div>
       </header>
 
@@ -196,12 +194,41 @@ export default function PetaniLayout() {
                 <span>Peta Komoditas</span>
               </NavLink>
 
-              <NavLink to="/petani/wisata">
-                <span className="petani-nav-icon">
-                  <LayoutIcon name="pin" />
-                </span>
-                <span>Lokasi Wisata</span>
-              </NavLink>
+              <div className={`petani-nav-group ${showWisataMenu ? 'is-open' : ''}`}>
+                <button
+                  type="button"
+                  className="petani-nav-group-btn"
+                  onClick={() => setShowWisataMenu(!showWisataMenu)}
+                >
+                  <span className="petani-nav-icon">
+                    <LayoutIcon name="map" />
+                  </span>
+                  <span>Informasi Wisata</span>
+                  <span className="petani-nav-chevron">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                      <polyline points={showWisataMenu ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                    </svg>
+                  </span>
+                </button>
+                
+                {showWisataMenu && (
+                  <div className="petani-nav-subitems">
+                    <NavLink to="/petani/wisata">
+                      <span className="petani-nav-icon">
+                        <LayoutIcon name="pin" />
+                      </span>
+                      <span>Lokasi Wisata</span>
+                    </NavLink>
+
+                    <NavLink to="/petani/ulasan">
+                      <span className="petani-nav-icon">
+                        <LayoutIcon name="star" />
+                      </span>
+                      <span>Ulasan Wisata</span>
+                    </NavLink>
+                  </div>
+                )}
+              </div>
 
               <p>AI</p>
 

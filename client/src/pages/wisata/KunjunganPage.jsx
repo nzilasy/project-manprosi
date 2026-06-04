@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
+  Area,
   Bar,
   CartesianGrid,
   ComposedChart,
@@ -18,9 +19,10 @@ import {
   scrollToPageTop,
 } from '../../utils/formValidation';
 import './KunjunganPage.css';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const CURRENT_YEAR = new Date().getFullYear();
-const REPORT_YEAR_OPTIONS = [2026, 2027, 2028];
+const REPORT_YEAR_OPTIONS = [2026, 2027, 2028, 2029];
 const YEAR_RECAP_YEARS = REPORT_YEAR_OPTIONS;
 
 const TREND_RANGE_OPTIONS = [
@@ -357,7 +359,7 @@ function TrendTooltip({ active, payload }) {
     <div className="kunjungan-chart-tooltip">
       <strong>{item.tooltipLabel}</strong>
       <span>Pengunjung: {formatNumber(item.pengunjung)} orang</span>
-      {item.trend !== null && <span>Rata-rata berjalan: {formatNumber(item.trend)} orang</span>}
+      {item.trend !== null && <span>Rata-rata bulanan: {formatNumber(item.trend)} orang</span>}
       {!item.isFuture && <em>{formatTrendChange(item.change)}</em>}
       {item.isFuture && <em>Belum ada data karena bulan ini belum berjalan.</em>}
     </div>
@@ -379,6 +381,12 @@ function getReportPeriod(item) {
   if (!match?.[1]) return start;
 
   return `${start} - ${formatDate(match[1])}`;
+}
+
+function getReportNote(item) {
+  if (!item.catatan) return '-';
+  const cleanNote = String(item.catatan).replace(/Periode sampai:\s*\d{4}-\d{2}-\d{2}\n?/, '').trim();
+  return cleanNote || '-';
 }
 
 function ReportIcon({ name }) {
@@ -415,12 +423,14 @@ export default function KunjunganPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [reportYear, setReportYear] = useState(CURRENT_YEAR);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(new Date().getMonth());
   const trendRange = 'year';
   const chartScrollRef = useRef(null);
+  const detailRef = useRef(null);
 
   const trendData = useMemo(
     () => buildTrendData(reports, trendRange, reportYear),
@@ -473,6 +483,15 @@ export default function KunjunganPage() {
 
     event.preventDefault();
     chartScrollRef.current.scrollLeft += event.deltaY;
+  };
+
+  const handleMonthClick = (monthIndex) => {
+    setSelectedMonthIndex(monthIndex);
+    if (showAllReports) {
+      setTimeout(() => {
+        detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
   };
 
   const handleReportYearChange = (nextYear) => {
@@ -543,6 +562,7 @@ export default function KunjunganPage() {
       ...INITIAL_FORM,
       id_wisata: current.id_wisata,
     }));
+    setEditingId(null);
   };
 
   const handleSubmit = async (event) => {
@@ -594,18 +614,29 @@ export default function KunjunganPage() {
         .filter(Boolean)
         .join('\n');
 
-      await kunjunganWisataService.create({
-        id_wisata: Number(form.id_wisata),
-        tanggal_kunjungan: form.tanggal_mulai,
-        jumlah_pengunjung: Number(form.jumlah_pengunjung),
-        catatan,
-      });
+      if (editingId) {
+        await kunjunganWisataService.update(editingId, {
+          id_wisata: Number(form.id_wisata),
+          tanggal_kunjungan: form.tanggal_mulai,
+          jumlah_pengunjung: Number(form.jumlah_pengunjung),
+          catatan,
+        });
+        setMessage('Laporan pengunjung berhasil diperbarui.');
+      } else {
+        await kunjunganWisataService.create({
+          id_wisata: Number(form.id_wisata),
+          tanggal_kunjungan: form.tanggal_mulai,
+          jumlah_pengunjung: Number(form.jumlah_pengunjung),
+          catatan,
+        });
+        setMessage('Laporan pengunjung berhasil disimpan.');
+      }
 
-      setMessage('Laporan pengunjung berhasil disimpan.');
       setForm((current) => ({
         ...INITIAL_FORM,
         id_wisata: current.id_wisata,
       }));
+      setEditingId(null);
       await loadData();
     } catch (err) {
       setError(
@@ -616,6 +647,32 @@ export default function KunjunganPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditReport = (item) => {
+    const id = item.id_kunjungan || item.id;
+    if (!id) return;
+
+    setEditingId(id);
+
+    let tanggal_selesai = '';
+    let catatan = item.catatan || '';
+
+    const match = String(catatan).match(/Periode sampai:\s*(\d{4}-\d{2}-\d{2})/);
+    if (match?.[1]) {
+      tanggal_selesai = match[1];
+      catatan = catatan.replace(/Periode sampai:\s*\d{4}-\d{2}-\d{2}\n?/, '').trim();
+    }
+
+    setForm({
+      id_wisata: String(item.id_wisata),
+      tanggal_mulai: item.tanggal_kunjungan,
+      tanggal_selesai,
+      jumlah_pengunjung: String(item.jumlah_pengunjung),
+      catatan,
+    });
+
+    scrollToPageTop();
   };
 
   const handleDeleteReport = async (item) => {
@@ -717,7 +774,7 @@ export default function KunjunganPage() {
                 <tr
                   key={`${reportYear}-${item.monthIndex}`}
                   className={item.monthIndex === selectedMonthIndex ? 'is-selected' : ''}
-                  onClick={() => setSelectedMonthIndex(item.monthIndex)}
+                  onClick={() => handleMonthClick(item.monthIndex)}
                 >
                   <td>
                     <strong>{item.monthLabel}</strong>
@@ -742,7 +799,7 @@ export default function KunjunganPage() {
       </div>
 
       {showAllReports && (
-        <div className="kunjungan-month-detail">
+        <div className="kunjungan-month-detail" ref={detailRef}>
           <div>
             <h3>Detail {selectedMonth?.monthLabel || reportYear}</h3>
             <p>
@@ -760,6 +817,7 @@ export default function KunjunganPage() {
                     <th>Lokasi Wisata</th>
                     <th>Periode</th>
                     <th>Pengunjung</th>
+                    <th>Catatan</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
@@ -773,15 +831,28 @@ export default function KunjunganPage() {
                         <td>{getReportWisataName(item)}</td>
                         <td>{getReportPeriod(item)}</td>
                         <td>{formatNumber(item.jumlah_pengunjung)}</td>
+                        <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={getReportNote(item)}>
+                          {getReportNote(item)}
+                        </td>
                         <td>
-                          <button
-                            type="button"
-                            className="kunjungan-delete-report"
-                            disabled={deletingId === id}
-                            onClick={() => handleDeleteReport(item)}
-                          >
-                            {deletingId === id ? 'Menghapus...' : 'Hapus'}
-                          </button>
+                          <div className="kunjungan-action-group">
+                            <button
+                              type="button"
+                              className="kunjungan-edit-report"
+                              disabled={deletingId === id || editingId === id}
+                              onClick={() => handleEditReport(item)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="kunjungan-delete-report"
+                              disabled={deletingId === id}
+                              onClick={() => handleDeleteReport(item)}
+                            >
+                              {deletingId === id ? 'Menghapus...' : 'Hapus'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -796,6 +867,90 @@ export default function KunjunganPage() {
           )}
         </div>
       )}
+    </article>
+  );
+  const renderForm = () => (
+    <article className="kunjungan-form-card">
+      <h2>{editingId ? 'Edit Laporan Pengunjung' : 'Buat Laporan Pengunjung'}</h2>
+
+      <form onSubmit={handleSubmit} noValidate>
+        {error && (
+          <div className="kunjungan-message error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <label>
+          Pilih Lokasi Wisata <strong>*</strong>
+          <SearchableSelect
+            options={wisataList.map(item => ({
+              value: String(item.id_wisata || item.id),
+              label: getWisataName(item)
+            }))}
+            value={form.id_wisata}
+            onChange={(value) => handleChange('id_wisata', value)}
+            placeholder="Pilih lokasi wisata"
+            disabled={loading || wisataList.length === 0}
+          />
+        </label>
+
+        <label>
+          Tanggal <strong>*</strong>
+          <div className="kunjungan-date-row">
+            <input
+              type="date"
+              min={currentMonthRange.startKey}
+              max={currentMonthRange.endKey}
+              value={form.tanggal_mulai}
+              onChange={(event) => handleChange('tanggal_mulai', event.target.value)}
+              required
+            />
+            <span>s/d</span>
+            <input
+              type="date"
+              min={currentMonthRange.startKey}
+              max={currentMonthRange.endKey}
+              value={form.tanggal_selesai}
+              onChange={(event) => handleChange('tanggal_selesai', event.target.value)}
+              required
+            />
+          </div>
+        </label>
+
+        <label>
+          Jumlah Pengunjung <strong>*</strong>
+          <div className="kunjungan-input-unit">
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.jumlah_pengunjung}
+              onChange={(event) => handleChange('jumlah_pengunjung', event.target.value)}
+              placeholder="Masukkan jumlah pengunjung"
+              required
+            />
+            <span>Orang</span>
+          </div>
+        </label>
+
+        <label>
+          Keterangan (Opsional)
+          <textarea
+            value={form.catatan}
+            onChange={(event) => handleChange('catatan', event.target.value)}
+            placeholder="Catatan tambahan (opsional)"
+          />
+        </label>
+
+        <div className="kunjungan-form-actions">
+          <button type="button" onClick={handleReset}>
+            {showAllReports && editingId ? 'Batal' : 'Reset'}
+          </button>
+          <button type="submit" disabled={submitting || !wisataList.length}>
+            {submitting ? 'Menyimpan...' : (editingId ? 'Perbarui Laporan' : 'Simpan Laporan')}
+          </button>
+        </div>
+      </form>
     </article>
   );
 
@@ -823,6 +978,14 @@ export default function KunjunganPage() {
         </section>
 
         {renderMonthlyReportCard()}
+
+        {editingId && (
+          <div className="kunjungan-modal-overlay">
+            <div className="kunjungan-modal-content">
+              {renderForm()}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -849,94 +1012,7 @@ export default function KunjunganPage() {
       </section>
 
       <section className="kunjungan-layout">
-        <article className="kunjungan-form-card">
-          <h2>Buat Laporan Pengunjung</h2>
-
-          <form onSubmit={handleSubmit} noValidate>
-            {error && (
-              <div className="kunjungan-message error" role="alert">
-                {error}
-              </div>
-            )}
-
-            <label>
-              Pilih Lokasi Wisata <strong>*</strong>
-              <select
-                value={form.id_wisata}
-                onChange={(event) => handleChange('id_wisata', event.target.value)}
-                required
-              >
-                <option value="">Pilih lokasi wisata</option>
-                {wisataList.map((item) => {
-                  const id = item.id_wisata || item.id;
-
-                  return (
-                    <option value={id} key={id}>
-                      {getWisataName(item)}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-
-            <label>
-              Tanggal <strong>*</strong>
-              <div className="kunjungan-date-row">
-                <input
-                  type="date"
-                  min={currentMonthRange.startKey}
-                  max={currentMonthRange.endKey}
-                  value={form.tanggal_mulai}
-                  onChange={(event) => handleChange('tanggal_mulai', event.target.value)}
-                  required
-                />
-                <span>s/d</span>
-                <input
-                  type="date"
-                  min={currentMonthRange.startKey}
-                  max={currentMonthRange.endKey}
-                  value={form.tanggal_selesai}
-                  onChange={(event) => handleChange('tanggal_selesai', event.target.value)}
-                  required
-                />
-              </div>
-            </label>
-
-            <label>
-              Jumlah Pengunjung <strong>*</strong>
-              <div className="kunjungan-input-unit">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.jumlah_pengunjung}
-                  onChange={(event) => handleChange('jumlah_pengunjung', event.target.value)}
-                  placeholder="Masukkan jumlah pengunjung"
-                  required
-                />
-                <span>Orang</span>
-              </div>
-            </label>
-
-            <label>
-              Keterangan (Opsional)
-              <textarea
-                value={form.catatan}
-                onChange={(event) => handleChange('catatan', event.target.value)}
-                placeholder="Catatan tambahan (opsional)"
-              />
-            </label>
-
-            <div className="kunjungan-form-actions">
-              <button type="button" onClick={handleReset}>
-                Reset
-              </button>
-              <button type="submit" disabled={submitting || !wisataList.length}>
-                {submitting ? 'Menyimpan...' : 'Simpan Laporan'}
-              </button>
-            </div>
-          </form>
-        </article>
+        {renderForm()}
 
         <div className="kunjungan-side-stack">
           <article className="kunjungan-chart-card">
@@ -1000,38 +1076,60 @@ export default function KunjunganPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart
                         data={trendData}
-                        margin={{ top: 16, right: 24, left: 0, bottom: 0 }}
+                        margin={{ top: 24, right: 32, left: 16, bottom: 0 }}
                       >
-                        <CartesianGrid stroke="#edf1f4" vertical={false} />
+                        <defs>
+                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#4ade80" stopOpacity={0.8}/>
+                            <stop offset="100%" stopColor="#22c55e" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#16a34a" stopOpacity={0.15}/>
+                            <stop offset="100%" stopColor="#16a34a" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke="#e2e8f0" vertical={false} strokeDasharray="4 4" />
                         <XAxis
                           dataKey="label"
                           tickLine={false}
                           axisLine={false}
                           interval={0}
-                          tick={{ fill: '#8aa0bb', fontSize: 10 }}
+                          tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                          dy={10}
                         />
                         <YAxis
                           tickLine={false}
                           axisLine={false}
-                          tick={{ fill: '#8aa0bb', fontSize: 10 }}
-                          width={34}
+                          tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                          width={44}
+                          tickFormatter={(val) => new Intl.NumberFormat('id-ID').format(val)}
                         />
-                        <Tooltip content={<TrendTooltip />} />
+                        <Tooltip
+                          content={<TrendTooltip />}
+                          cursor={{ fill: 'rgba(22, 163, 74, 0.04)' }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="trendLine"
+                          stroke="none"
+                          fill="url(#areaGradient)"
+                          connectNulls={false}
+                        />
                         <Bar
                           dataKey="pengunjung"
                           name="Pengunjung"
-                          fill="#dfeee5"
-                          radius={[7, 7, 0, 0]}
-                          maxBarSize={34}
+                          fill="url(#barGradient)"
+                          radius={[8, 8, 0, 0]}
+                          maxBarSize={28}
                         />
                         <Line
                           type="monotone"
                           dataKey="trendLine"
-                          name="Rata-rata berjalan"
-                          stroke="#5fbf70"
-                          strokeWidth={2}
-                          dot={{ r: 4, fill: '#ffffff', stroke: '#5fbf70', strokeWidth: 2 }}
-                          activeDot={{ r: 6, fill: '#5fbf70', strokeWidth: 0 }}
+                          name="Rata-rata bulanan"
+                          stroke="#15803d"
+                          strokeWidth={2.5}
+                          dot={{ r: 4, fill: '#ffffff', stroke: '#15803d', strokeWidth: 2 }}
+                          activeDot={{ r: 6, fill: '#16a34a', strokeWidth: 0, strokeOpacity: 0.2 }}
                           connectNulls={false}
                         />
                       </ComposedChart>

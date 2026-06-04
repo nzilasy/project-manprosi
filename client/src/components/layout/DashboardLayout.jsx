@@ -28,17 +28,17 @@ function DashboardIcon({ name }) {
         <circle cx="12" cy="8" r="4" />
         <path d="M4 21a8 8 0 0 1 16 0" />
       </svg>
-    ),
+    )
   };
 
   return icons[name] || null;
 }
 
 export default function DashboardLayout() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [showSidebar, setShowSidebar] = useState(true);
-  const [showUserMenu, setShowUserMenu] = useState(false);
+
   const roleLabels = {
     petani: 'Petani',
     pengurus: 'Pengurus Desa',
@@ -50,22 +50,13 @@ export default function DashboardLayout() {
     user?.name ||
     user?.nama_user ||
     user?.username ||
-    'Budi Santoso';
+    'User';
 
   const userRoleKey = user?.role || 'petani';
   const userRole = roleLabels[userRoleKey] || userRoleKey;
 
-  const handleLogout = () => {
-    setShowUserMenu(false);
-
-    if (typeof logout === 'function') {
-      logout();
-    } else {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    }
-
-    navigate('/login');
+  const handleProfileClick = () => {
+    navigate('/profile');
   };
 
   return (
@@ -84,7 +75,8 @@ export default function DashboardLayout() {
           <button
             type="button"
             className="dashboard-user-button"
-            onClick={() => setShowUserMenu((previous) => !previous)}
+            onClick={handleProfileClick}
+            title="Lihat Profil"
           >
             <span className="dashboard-user-icon">
               <DashboardIcon name="user" />
@@ -93,19 +85,6 @@ export default function DashboardLayout() {
             <span>•</span>
             <span className="dashboard-user-role">{userRole}</span>
           </button>
-
-          {showUserMenu && (
-            <div className="dashboard-user-dropdown">
-              <div className="dashboard-user-dropdown-header">
-                <strong>{userName}</strong>
-                <span>{userRole}</span>
-              </div>
-
-              <button type="button" onClick={handleLogout}>
-                Keluar dari akun
-              </button>
-            </div>
-          )}
         </div>
       </header>
 

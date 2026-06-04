@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const navByRole = {
@@ -17,6 +18,7 @@ const navByRole = {
       items: [
         { to: '/petani/komoditas', label: 'Peta Komoditas', icon: 'map' },
         { to: '/petani/wisata', label: 'Lokasi Wisata', icon: 'map-pin' },
+        { to: '/petani/ulasan', label: 'Ulasan Wisata', icon: 'star' },
       ],
     },
     {
@@ -54,8 +56,16 @@ const navByRole = {
     {
       group: 'INFORMASI DESA',
       items: [
-        { to: '/masyarakat/wisata', label: 'Peta Wisata', icon: 'map' },
         { to: '/masyarakat/komoditas', label: 'Peta Komoditas', icon: 'file-search' },
+        {
+          to: '/masyarakat/wisata',
+          label: 'Informasi Wisata',
+          icon: 'map',
+          children: [
+            { to: '/masyarakat/wisata', label: 'Lokasi Wisata' },
+            { to: '/masyarakat/ulasan', label: 'Ulasan Wisata' },
+          ],
+        },
       ],
     },
   ],
@@ -74,6 +84,7 @@ const navByRole = {
             { to: '/wisata/laporan/riwayat', label: 'Riwayat Laporan' },
           ],
         },
+        { to: '/wisata/ulasan', label: 'Ulasan Pengunjung', icon: 'star' },
         { to: '/wisata/kendala', label: 'Lapor Kendala', icon: 'alert' },
       ],
     },
@@ -141,6 +152,11 @@ const sidebarIcons = {
       <path d="M9 16h6" />
     </>
   ),
+  star: (
+    <>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
   sparkles: (
     <>
       <path d="M12 3.5 13.7 9l5.3 2-5.3 2L12 18.5 10.3 13 5 11l5.3-2L12 3.5Z" />
@@ -200,6 +216,81 @@ function SidebarIcon({ name }) {
   );
 }
 
+function SidebarItem({ item }) {
+  const location = useLocation();
+  const isChildActive = item.children?.some(
+    (child) => location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)
+  );
+  const isParentActive = location.pathname === item.to;
+  
+  const [isOpen, setIsOpen] = useState(isChildActive || isParentActive);
+
+  if (!item.children?.length) {
+    return (
+      <div className="dashboard-nav-item">
+        <NavLink
+          to={item.to}
+          className={({ isActive }) =>
+            isActive ? 'dashboard-nav-link is-active' : 'dashboard-nav-link'
+          }
+        >
+          <span className="dashboard-nav-icon" aria-hidden="true">
+            <SidebarIcon name={item.icon} />
+          </span>
+          <span>{item.label}</span>
+        </NavLink>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dashboard-nav-item">
+      <button
+        type="button"
+        className={`dashboard-nav-link dashboard-nav-link-btn ${
+          isChildActive || isParentActive ? 'is-active' : ''
+        }`}
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+      >
+        <span className="dashboard-nav-icon" aria-hidden="true">
+          <SidebarIcon name={item.icon} />
+        </span>
+        <span>{item.label}</span>
+        <span
+          className="dashboard-nav-chevron"
+          aria-hidden="true"
+          style={{
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+          }}
+        >
+          <svg viewBox="0 0 20 20" focusable="false">
+            <path d="m5 7 5 5 5-5" />
+          </svg>
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="dashboard-nav-children">
+          {item.children.map((child) => (
+            <NavLink
+              key={child.to}
+              to={child.to}
+              end={child.to === item.to}
+              className={({ isActive }) =>
+                isActive ? 'dashboard-nav-child-link is-active' : 'dashboard-nav-child-link'
+              }
+            >
+              {child.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -221,47 +312,7 @@ export default function Sidebar() {
 
             <nav>
               {group.items.map((item) => (
-                <div className="dashboard-nav-item" key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'dashboard-nav-link is-active'
-                        : 'dashboard-nav-link'
-                    }
-                  >
-                    <span className="dashboard-nav-icon" aria-hidden="true">
-                      <SidebarIcon name={item.icon} />
-                    </span>
-                    <span>{item.label}</span>
-                    {item.children?.length ? (
-                      <span className="dashboard-nav-chevron" aria-hidden="true">
-                        <svg viewBox="0 0 20 20" focusable="false">
-                          <path d="m5 7 5 5 5-5" />
-                        </svg>
-                      </span>
-                    ) : null}
-                  </NavLink>
-
-                  {item.children?.length ? (
-                    <div className="dashboard-nav-children">
-                      {item.children.map((child) => (
-                        <NavLink
-                          key={child.to}
-                          to={child.to}
-                          end={child.to === item.to}
-                          className={({ isActive }) =>
-                            isActive
-                              ? 'dashboard-nav-child-link is-active'
-                              : 'dashboard-nav-child-link'
-                          }
-                        >
-                          {child.label}
-                        </NavLink>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+                <SidebarItem key={item.to} item={item} />
               ))}
             </nav>
           </section>

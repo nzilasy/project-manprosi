@@ -80,10 +80,6 @@ export default function LoginPage() {
             </Field>
 
             <div style={styles.authLinksRow}>
-              <Link to="/forgot-password" style={styles.helperLink}>
-                Lupa password?
-              </Link>
-
               <Link to="/register" style={styles.helperLink}>
                 Buat akun
               </Link>
@@ -239,7 +235,7 @@ const styles = {
   authLinksRow: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     gap: '12px',
     marginTop: '-4px',
     fontSize: '12px',

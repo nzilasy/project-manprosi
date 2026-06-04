@@ -10,4 +10,6 @@ export const authService = {
     localStorage.removeItem('user');
   },
   getProfile: () => api.get('/auth/me'),
+  changePassword: (currentPassword, newPassword) =>
+    api.put('/auth/change-password', { currentPassword, newPassword }),
 };

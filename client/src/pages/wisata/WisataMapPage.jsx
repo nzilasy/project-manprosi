@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   MapContainer,
   Marker,
@@ -217,6 +218,11 @@ function WisataIcon({ name, size = 18 }) {
       <svg {...commonProps}>
         <path d="M12 20h9" />
         <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+      </svg>
+    ),
+    chat: (
+      <svg {...commonProps}>
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
       </svg>
     ),
   };
@@ -471,6 +477,13 @@ function getWisataAddFormIssues(form, position) {
     issues.push({ key: 'fasilitas', label: 'Fasilitas' });
   }
 
+  if (form.harga_tiket) {
+    const hargaNum = Number(form.harga_tiket);
+    if (isNaN(hargaNum) || hargaNum < 1000) {
+      issues.push({ key: 'harga_tiket', label: 'Harga Tiket (harus minimal 1000)' });
+    }
+  }
+
   const latitudeText = String(form.latitude || '').trim();
   const longitudeText = String(form.longitude || '').trim();
 
@@ -611,9 +624,16 @@ function MapFocus({ items, resetKey, focusTarget }) {
 
     if (focusMode === 'reset') {
       map.closePopup();
-      map.setView(focusPosition, focusZoom || DEFAULT_MAP_ZOOM, {
-        animate: true,
-      });
+      const positions = items.map((item) => item.position).filter(Boolean);
+      if (positions.length > 1) {
+        map.fitBounds(positions, { padding: [58, 58], maxZoom: FOCUS_MAP_ZOOM, animate: true });
+      } else if (positions.length === 1) {
+        map.flyTo(positions[0], FOCUS_MAP_ZOOM, { duration: 0.75 });
+      } else {
+        map.setView(focusPosition || DEFAULT_CENTER, focusZoom || DEFAULT_MAP_ZOOM, {
+          animate: true,
+        });
+      }
       handledResetKeyRef.current = focusKey;
       return;
     }
@@ -652,6 +672,7 @@ function AddWisataMapPicker({ active, onPick }) {
 
 export default function WisataMapPage({ readOnly = false }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const mapCardRef = useRef(null);
   const listCardRef = useRef(null);
   const addFormPanelRef = useRef(null);
@@ -663,7 +684,7 @@ export default function WisataMapPage({ readOnly = false }) {
   const [category, setCategory] = useState('semua');
   const [distance, setDistance] = useState('semua');
   const [selectedFacilities, setSelectedFacilities] = useState([]);
-  const [sortOrder, setSortOrder] = useState('terbaru');
+  const [searchQuery, setSearchQuery] = useState('');
   const [resetKey, setResetKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -682,9 +703,10 @@ export default function WisataMapPage({ readOnly = false }) {
   const [error, setError] = useState('');
   const [missingFieldKeys, setMissingFieldKeys] = useState(() => new Set());
   const [ratingForms, setRatingForms] = useState({});
+  const [activeRatingFormId, setActiveRatingFormId] = useState(null);
   const [ratingSavingId, setRatingSavingId] = useState(null);
   const canManageWisata = !readOnly && ['wisata', 'pengurus'].includes(user?.role);
-  const canRateWisata = readOnly && user?.role === 'masyarakat';
+  const canRateWisata = readOnly && ['masyarakat', 'petani', 'pengurus'].includes(user?.role);
   const showCurrentLocationMarker = Boolean(currentLocation);
   const createMapFocusKey = (prefix) => {
     focusKeyRef.current += 1;
@@ -785,10 +807,11 @@ export default function WisataMapPage({ readOnly = false }) {
       const matchDistance =
         distance === 'semua' ||
         (item.distanceKm !== null && item.distanceKm <= Number(distance));
+      const matchSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchCategory && matchFacilities && matchDistance;
+      return matchCategory && matchFacilities && matchDistance && matchSearch;
     });
-  }, [category, distance, enrichedWisata, selectedFacilities]);
+  }, [category, distance, enrichedWisata, selectedFacilities, searchQuery]);
 
   const nearestWisata = useMemo(() => {
     if (!currentLocation) return [];
@@ -801,10 +824,6 @@ export default function WisataMapPage({ readOnly = false }) {
   const displayedWisata = useMemo(() => {
     const nextWisata = [...filteredWisata];
 
-    if (sortOrder === 'terdekat') {
-      return nextWisata.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
-    }
-
     return nextWisata.sort((a, b) => {
       const statusPriority = Number(isNewlyOpenedStatus(b.status)) -
         Number(isNewlyOpenedStatus(a.status));
@@ -813,11 +832,18 @@ export default function WisataMapPage({ readOnly = false }) {
 
       return getNewestSortValue(b) - getNewestSortValue(a);
     });
-  }, [filteredWisata, sortOrder]);
+  }, [filteredWisata]);
 
   const visibleWisataCards = showAllWisata
     ? displayedWisata
     : displayedWisata.slice(0, 3);
+
+  const activeRatingWisata = useMemo(() => {
+    if (!activeRatingFormId) return null;
+    return enrichedWisata.find((item) => item.id === activeRatingFormId) || null;
+  }, [enrichedWisata, activeRatingFormId]);
+
+  const [ratingSuccessId, setRatingSuccessId] = useState(null);
 
   const summary = useMemo(() => {
     return {
@@ -887,7 +913,7 @@ export default function WisataMapPage({ readOnly = false }) {
     setCategory('semua');
     setDistance('semua');
     setSelectedFacilities([]);
-    setSortOrder('terbaru');
+    setSearchQuery('');
     setShowAllWisata(false);
     setMapFocusTarget({
       mode: 'reset',
@@ -970,7 +996,7 @@ export default function WisataMapPage({ readOnly = false }) {
           key: createMapFocusKey('current-location'),
         });
         setLocationStatus('Lokasi perangkat berhasil digunakan.');
-        setMessage('Lokasi saat ini berhasil digunakan sebagai patokan jarak.');
+        setMessage('Lokasi saat ini berhasil digunakan.');
         setError('');
         setIsLocating(false);
         scrollMapIntoView();
@@ -1000,7 +1026,7 @@ export default function WisataMapPage({ readOnly = false }) {
     setCategory('semua');
     setDistance('semua');
     setSelectedFacilities([]);
-    setSortOrder('terbaru');
+    setSearchQuery('');
     setMapFocusTarget(null);
     setShowAllWisata(true);
     setResetKey((current) => current + 1);
@@ -1116,8 +1142,6 @@ export default function WisataMapPage({ readOnly = false }) {
 
     setAddForm((current) => ({
       ...current,
-      // Patokan lokasi hanya untuk navigasi peta; jangan isi alamat dengan nama pencarian.
-      alamat: streetLine || current.alamat,
       desa_kelurahan:
         address.village ||
         address.suburb ||
@@ -1256,9 +1280,8 @@ export default function WisataMapPage({ readOnly = false }) {
     try {
       const payload = {
         ...addForm,
+        alamat: '',
         harga_tiket: addForm.harga_tiket === '' ? null : Number(addForm.harga_tiket),
-        rating: addForm.rating,
-        jumlah_ulasan: addForm.reviews,
         latitude: addFormPosition[0],
         longitude: addFormPosition[1],
         fasilitas: listFromText(addForm.fasilitas),
@@ -1281,7 +1304,7 @@ export default function WisataMapPage({ readOnly = false }) {
       setCategory('semua');
       setDistance('semua');
       setSelectedFacilities([]);
-      setSortOrder('terbaru');
+      setSearchQuery('');
       setResetKey((current) => current + 1);
     } catch (err) {
       setError(
@@ -1463,7 +1486,7 @@ export default function WisataMapPage({ readOnly = false }) {
                 Harga Tiket
                 <input
                   type="number"
-                  min="0"
+                  min="1000"
                   value={addForm.harga_tiket}
                   onChange={(event) => handleAddFormChange('harga_tiket', event.target.value)}
                   placeholder="Contoh: 10000"
@@ -1510,14 +1533,6 @@ export default function WisataMapPage({ readOnly = false }) {
               )}
             </div>
 
-            <label>
-              Alamat / Detail Lokasi
-              <input
-                value={addForm.alamat}
-                onChange={(event) => handleAddFormChange('alamat', event.target.value)}
-                placeholder="Contoh: Jalan Braga No. 12 (opsional)"
-              />
-            </label>
 
             <div className="wisata-add-form-grid four">
               <label className={isMissingField('desa_kelurahan') ? 'wisata-field-missing' : undefined}>
@@ -1636,27 +1651,6 @@ export default function WisataMapPage({ readOnly = false }) {
               />
             </label>
 
-            <div className="wisata-add-form-grid">
-              <label>
-                Rating
-                <input
-                  type="text"
-                  value={addForm.rating}
-                  onChange={(event) => handleAddFormChange('rating', event.target.value)}
-                  placeholder="Contoh: 4,5"
-                />
-              </label>
-
-              <label>
-                Jumlah Ulasan
-                <input
-                  type="text"
-                  value={addForm.reviews}
-                  onChange={(event) => handleAddFormChange('reviews', event.target.value)}
-                  placeholder="Contoh: 1.980"
-                />
-              </label>
-            </div>
 
             <label>
               Deskripsi
@@ -1724,8 +1718,12 @@ export default function WisataMapPage({ readOnly = false }) {
                       {item.name}
                     </Tooltip>
 
-                    <Popup closeButton>
-                      <div className="wisata-popup">
+                    <Popup 
+                      closeButton 
+                      maxWidth={item.description ? 240 : 265} 
+                      minWidth={item.description ? 240 : 265}
+                    >
+                      <div className={`wisata-popup ${item.description ? 'has-description' : ''}`}>
                         <img src={item.image} alt="" />
                         <div>
                           <h3>{item.name}</h3>
@@ -1734,32 +1732,55 @@ export default function WisataMapPage({ readOnly = false }) {
                           <p className="wisata-distance-line">
                             Jarak dari lokasi saat ini: {formatDistance(item.distanceKm)}
                           </p>
+                          {item.ticketPrice && Number(item.ticketPrice) >= 1000 && (
+                            <p style={{ margin: '4px 0 8px 0', fontSize: '13px', color: '#475569' }}>
+                              Harga Tiket: <strong>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(item.ticketPrice)}</strong>
+                            </p>
+                          )}
                           <strong>
                             <WisataIcon name="star" size={14} />
                             {formatRating(item.rating)} ({formatReviewCount(item.reviews)})
                           </strong>
-                          {canManageWisata && !item.isFallback && (
-                            <div className="wisata-popup-actions">
-                              <button
-                                type="button"
-                                className="wisata-edit-button compact"
-                                onClick={() => handleStartEditWisata(item)}
-                              >
-                                <WisataIcon name="edit" size={13} />
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="wisata-delete-button compact"
-                                disabled={deletingId === item.id}
-                                onClick={() => handleDeleteWisata(item)}
-                              >
-                                <WisataIcon name="trash" size={13} />
-                                {deletingId === item.id ? 'Menghapus...' : 'Hapus'}
-                              </button>
-                            </div>
-                          )}
                         </div>
+                        {item.description && (
+                          <p className="wisata-description-text popup">
+                            {item.description}
+                          </p>
+                        )}
+                        {canRateWisata && !item.isFallback && (
+                          <div className="wisata-popup-actions full-width" style={{ marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              className="wisata-rating-toggle-btn"
+                              onClick={() => setActiveRatingFormId(item.id)}
+                              style={{ width: '100%' }}
+                            >
+                              <WisataIcon name="edit" size={14} />
+                              Berikan Ulasan
+                            </button>
+                          </div>
+                        )}
+                        {canManageWisata && !item.isFallback && (
+                          <div className="wisata-popup-actions full-width" style={{ marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              className="wisata-edit-button compact"
+                              onClick={() => handleStartEditWisata(item)}
+                            >
+                              <WisataIcon name="edit" size={13} />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="wisata-delete-button compact"
+                              disabled={deletingId === item.id}
+                              onClick={() => handleDeleteWisata(item)}
+                            >
+                              <WisataIcon name="trash" size={13} />
+                              {deletingId === item.id ? 'Menghapus...' : 'Hapus'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </Popup>
                   </Marker>
@@ -1858,14 +1879,14 @@ export default function WisataMapPage({ readOnly = false }) {
                   </button>
                 )}
                 <label>
-                  Urutkan
-                  <select
-                    value={sortOrder}
-                    onChange={(event) => setSortOrder(event.target.value)}
-                  >
-                    <option value="terbaru">Terbaru</option>
-                    <option value="terdekat">Terdekat</option>
-                  </select>
+                  Pencarian lokasi wisata
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Cari nama lokasi..."
+                    className="wisata-search-input"
+                  />
                 </label>
               </div>
             </div>
@@ -1899,45 +1920,26 @@ export default function WisataMapPage({ readOnly = false }) {
                         <p className="wisata-card-distance">
                           Jarak dari lokasi saat ini: <span>{formatDistance(item.distanceKm)}</span>
                         </p>
+                        {item.ticketPrice && Number(item.ticketPrice) >= 1000 && (
+                          <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#475569' }}>
+                            Harga Tiket: <strong>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(item.ticketPrice)}</strong>
+                          </p>
+                        )}
                         <strong>
                           <WisataIcon name="star" size={15} />
                           {formatRating(item.rating)} ({formatReviewCount(item.reviews)})
                         </strong>
+
                         {canRateWisata && !item.isFallback && (
-                          <form
-                            className="wisata-rating-form"
-                            onSubmit={(event) => handleSubmitRating(event, item)}
+                          <button
+                            type="button"
+                            className="wisata-rating-toggle-btn"
+                            onClick={() => setActiveRatingFormId(item.id)}
+                            style={{ marginTop: '16px' }}
                           >
-                            <label>
-                              Rating anda
-                              <select
-                                value={ratingForms[item.id]?.rating || ''}
-                                onChange={(event) =>
-                                  handleRatingFormChange(item.id, 'rating', event.target.value)
-                                }
-                              >
-                                <option value="">Pilih rating</option>
-                                <option value="5">5 - Sangat baik</option>
-                                <option value="4">4 - Baik</option>
-                                <option value="3">3 - Cukup</option>
-                                <option value="2">2 - Kurang</option>
-                                <option value="1">1 - Buruk</option>
-                              </select>
-                            </label>
-                            <label>
-                              Ulasan
-                              <textarea
-                                value={ratingForms[item.id]?.ulasan || ''}
-                                onChange={(event) =>
-                                  handleRatingFormChange(item.id, 'ulasan', event.target.value)
-                                }
-                                placeholder="Tulis ulasan singkat..."
-                              />
-                            </label>
-                            <button type="submit" disabled={ratingSavingId === item.id}>
-                              {ratingSavingId === item.id ? 'Menyimpan...' : 'Kirim Rating'}
-                            </button>
-                          </form>
+                            <WisataIcon name="edit" size={14} />
+                            Berikan Ulasan
+                          </button>
                         )}
                         {canManageWisata && !item.isFallback && (
                           <div className="wisata-card-actions">
@@ -1979,40 +1981,7 @@ export default function WisataMapPage({ readOnly = false }) {
             )}
           </section>
 
-          <section className="wisata-summary-section">
-            <h2>Ringkasan Wisata</h2>
 
-            <div className="wisata-summary-grid">
-              <SummaryCard
-                icon="pin"
-                label="Lokasi"
-                value={summary.total}
-                text="Total Lokasi"
-                tone="green"
-              />
-              <SummaryCard
-                icon="ticket"
-                label="Wisata Budaya"
-                value={summary.budaya}
-                text="Total Wisata Budaya"
-                tone="blue"
-              />
-              <SummaryCard
-                icon="mountain"
-                label="Wisata Alam"
-                value={summary.alam}
-                text="Total Wisata Alam"
-                tone="orange"
-              />
-              <SummaryCard
-                icon="dots"
-                label="Wisata Buatan"
-                value={summary.buatan}
-                text="Total Wisata Buatan"
-                tone="purple"
-              />
-            </div>
-          </section>
         </div>
 
         <aside className="wisata-side-column">
@@ -2110,6 +2079,129 @@ export default function WisataMapPage({ readOnly = false }) {
           </section>
         </aside>
       </section>
+
+      {/* MODAL BERIKAN ULASAN */}
+      {activeRatingFormId && activeRatingWisata && (
+        <div className="wisata-modal-overlay" onClick={() => { setActiveRatingFormId(null); setRatingSuccessId(null); }}>
+          <div className="wisata-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="wisata-modal-header">
+              <h3 className="wisata-modal-title">Berikan Ulasan</h3>
+              <button
+                type="button"
+                className="wisata-modal-close"
+                onClick={() => { setActiveRatingFormId(null); setRatingSuccessId(null); }}
+              >
+                ×
+              </button>
+            </div>
+
+            {ratingSuccessId === activeRatingFormId ? (
+              <div className="wisata-rating-success-msg" style={{ flexDirection: 'column', height: 'auto', padding: '32px 16px', gap: '12px' }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <strong style={{ fontSize: '15px', color: '#059669' }}>Ulasan berhasil dikirim!</strong>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Terima kasih atas ulasan Anda untuk {activeRatingWisata.name}</p>
+                <button
+                  type="button"
+                  className="wisata-rating-toggle-btn"
+                  onClick={() => { setActiveRatingFormId(null); setRatingSuccessId(null); }}
+                  style={{ marginTop: '8px', width: '100%' }}
+                >
+                  Tutup
+                </button>
+              </div>
+            ) : (
+              <form
+                className="wisata-rating-form"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (!canRateWisata || activeRatingWisata.isFallback) return;
+
+                  const form = ratingForms[activeRatingFormId] || {};
+                  const ratingVal = Number(form.rating);
+                  if (!ratingVal || ratingVal < 1 || ratingVal > 5) {
+                    setError('Rating harus diisi antara 1 sampai 5.');
+                    return;
+                  }
+
+                  setRatingSavingId(activeRatingFormId);
+                  setError('');
+                  setMessage('');
+
+                  try {
+                    const { data } = await wisataService.rate(activeRatingFormId, {
+                      rating: ratingVal,
+                      ulasan: form.ulasan || '',
+                    });
+                    const updated = data.data;
+                    if (updated) {
+                      setWisata((current) =>
+                        current.map((row) => {
+                          const rowId = row.id || row.id_wisata;
+                          return Number(rowId) === Number(activeRatingFormId) ? updated : row;
+                        }),
+                      );
+                    }
+                    setRatingForms((prev) => ({ ...prev, [activeRatingFormId]: {} }));
+                    setRatingSuccessId(activeRatingFormId);
+                    setMessage('Ulasan berhasil dikirim!');
+                  } catch (err) {
+                    setError(err.response?.data?.message || 'Gagal mengirim ulasan.');
+                  } finally {
+                    setRatingSavingId(null);
+                  }
+                }}
+              >
+                <div>
+                  <span className="wisata-rating-label">Rating Anda</span>
+                  <div className="wisata-star-rating-input">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        className={`wisata-star-btn ${Number(ratingForms[activeRatingFormId]?.rating) >= star ? 'active' : ''}`}
+                        onClick={() => handleRatingFormChange(activeRatingFormId, 'rating', String(star))}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill={Number(ratingForms[activeRatingFormId]?.rating) >= star ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                  {Number(ratingForms[activeRatingFormId]?.rating) > 0 && (
+                    <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#64748b' }}>
+                      {['', 'Buruk', 'Kurang', 'Cukup', 'Baik', 'Sangat Baik'][Number(ratingForms[activeRatingFormId]?.rating)] || ''}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <span className="wisata-rating-label">Ulasan</span>
+                  <div className="wisata-rating-textarea-wrapper">
+                    <textarea
+                      value={ratingForms[activeRatingFormId]?.ulasan || ''}
+                      onChange={(event) =>
+                        handleRatingFormChange(activeRatingFormId, 'ulasan', event.target.value)
+                      }
+                      placeholder="Ceritakan pengalaman Anda di tempat wisata ini..."
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <p style={{ color: '#dc2626', fontSize: '12px', margin: 0 }}>{error}</p>
+                )}
+
+                <button type="submit" disabled={ratingSavingId === activeRatingFormId}>
+                  {ratingSavingId === activeRatingFormId ? 'Menyimpan...' : 'Kirim Ulasan'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
