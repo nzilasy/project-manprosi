@@ -2,22 +2,91 @@
   color: #172033;
 }
 
-.wisata-dashboard-header {
-  margin-bottom: 24px;
+.wisata-dashboard-hero {
+  position: relative;
+  margin-bottom: 32px;
+  padding: 36px 40px 32px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 40%, #40916c 100%);
+  color: #ffffff;
+  overflow: hidden;
+  animation: heroFadeIn 0.6s ease-out;
 }
 
-.wisata-dashboard-header h1 {
+.wisata-hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.wisata-dashboard-hero h1 {
   margin: 0;
-  color: #172033;
-  font-size: 31px;
+  color: #ffffff;
+  font-size: 30px;
   font-weight: 900;
   letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
-.wisata-dashboard-header p {
+.wisata-dashboard-hero p {
   margin: 6px 0 0;
-  color: #71839a;
+  color: rgba(255, 255, 255, 0.78);
   font-size: 15px;
+  line-height: 1.5;
+}
+
+.wisata-dashboard-hero time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(4px);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.wisata-dashboard-hero time svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.wisata-hero-decoration {
+  position: absolute;
+  top: -40px;
+  right: -30px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.10) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wisata-hero-decoration::after {
+  content: '';
+  position: absolute;
+  bottom: -60px;
+  left: -120px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+}
+
+@keyframes heroFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .wisata-dashboard-message {

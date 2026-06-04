@@ -100,6 +100,24 @@ const FALLBACK_REPORTS = [
   },
 ];
 
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'Selamat pagi';
+  if (hour < 15) return 'Selamat siang';
+  if (hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
+}
+
+function getFormattedDate() {
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date());
+}
+
 function DashboardIcon({ name }) {
   const props = {
     viewBox: '0 0 24 24',
@@ -150,6 +168,14 @@ function DashboardIcon({ name }) {
       <svg {...props}>
         <path d="M3 12a9 9 0 1 0 3-6.7" />
         <path d="M3 4v6h6" />
+      </svg>
+    ),
+    calendar: (
+      <svg {...props}>
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4" />
+        <path d="M8 2v4" />
+        <path d="M3 10h18" />
       </svg>
     ),
     map: (
@@ -415,6 +441,9 @@ export default function PengurusDashboard() {
     user?.username ||
     'Ahmad Fauzi';
 
+  const greeting = getGreeting();
+  const formattedDate = getFormattedDate();
+
   useEffect(() => {
     let active = true;
 
@@ -634,10 +663,15 @@ export default function PengurusDashboard() {
   return (
     <div className="pengurus-dashboard">
       <section className="pengurus-dashboard-hero">
-        <div>
-          <h1>Selamat datang, {userName}!</h1>
-          <p>Kelola potensi desa dengan mudah dan efektif.</p>
+        <div className="pengurus-hero-content">
+          <h1>{greeting}, {userName}! 👋</h1>
+          <p>Berikut ringkasan potensi dan laporan milik desa Anda</p>
+          <time>
+            <DashboardIcon name="calendar" />
+            {formattedDate}
+          </time>
         </div>
+        <div className="pengurus-hero-decoration" aria-hidden="true" />
       </section>
 
       {error && <div className="pengurus-message is-error">{error}</div>}
