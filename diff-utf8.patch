@@ -1,0 +1,144 @@
+﻿diff --git a/client/src/pages/wisata/WisataMapPage.jsx b/client/src/pages/wisata/WisataMapPage.jsx
+index 17f3d26..eb6dd38 100644
+--- a/client/src/pages/wisata/WisataMapPage.jsx
++++ b/client/src/pages/wisata/WisataMapPage.jsx
+@@ -682,9 +682,10 @@ export default function WisataMapPage({ readOnly = false }) {
+   const [error, setError] = useState('');
+   const [missingFieldKeys, setMissingFieldKeys] = useState(() => new Set());
+   const [ratingForms, setRatingForms] = useState({});
++  const [activeRatingFormId, setActiveRatingFormId] = useState(null);
+   const [ratingSavingId, setRatingSavingId] = useState(null);
+   const canManageWisata = !readOnly && ['wisata', 'pengurus'].includes(user?.role);
+-  const canRateWisata = readOnly && user?.role === 'masyarakat';
++  const canRateWisata = readOnly && ['masyarakat', 'petani', 'pengurus'].includes(user?.role);
+   const showCurrentLocationMarker = Boolean(currentLocation);
+   const createMapFocusKey = (prefix) => {
+     focusKeyRef.current += 1;
+@@ -815,6 +816,23 @@ export default function WisataMapPage({ readOnly = false }) {
+     });
+   }, [filteredWisata, sortOrder]);
+ 
++  const displayedWisata = useMemo(() => {
++    const nextWisata = [...filteredWisata];
++
++    if (sortOrder === 'terdekat') {
++      return nextWisata.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
++    }
++
++    return nextWisata.sort((a, b) => {
++      const statusPriority = Number(isNewlyOpenedStatus(b.status)) -
++        Number(isNewlyOpenedStatus(a.status));
++
++      if (statusPriority !== 0) return statusPriority;
++
++      return getNewestSortValue(b) - getNewestSortValue(a);
++    });
++  }, [filteredWisata, sortOrder]);
++
+   const visibleWisataCards = showAllWisata
+     ? displayedWisata
+     : displayedWisata.slice(0, 3);
+@@ -828,6 +846,10 @@ export default function WisataMapPage({ readOnly = false }) {
+     };
+   }, [enrichedWisata]);
+ 
++  const activeRatingWisata = useMemo(() => {
++    return enrichedWisata.find((item) => item.id === activeRatingFormId) || null;
++  }, [enrichedWisata, activeRatingFormId]);
++
+   const addFormPosition = useMemo(() => {
+     const latitude = parseCoordinateInput(addForm.latitude, 'lat');
+     const longitude = parseCoordinateInput(addForm.longitude, 'lng');
+@@ -1904,40 +1926,16 @@ export default function WisataMapPage({ readOnly = false }) {
+                           {formatRating(item.rating)} ({formatReviewCount(item.reviews)})
+                         </strong>
+                         {canRateWisata && !item.isFallback && (
+-                          <form
+-                            className="wisata-rating-form"
+-                            onSubmit={(event) => handleSubmitRating(event, item)}
+-                          >
+-                            <label>
+-                              Rating anda
+-                              <select
+-                                value={ratingForms[item.id]?.rating || ''}
+-                                onChange={(event) =>
+-                                  handleRatingFormChange(item.id, 'rating', event.target.value)
+-                                }
+-                              >
+-                                <option value="">Pilih rating</option>
+-                                <option value="5">5 - Sangat baik</option>
+-                                <option value="4">4 - Baik</option>
+-                                <option value="3">3 - Cukup</option>
+-                                <option value="2">2 - Kurang</option>
+-                                <option value="1">1 - Buruk</option>
+-                              </select>
+-                            </label>
+-                            <label>
+-                              Ulasan
+-                              <textarea
+-                                value={ratingForms[item.id]?.ulasan || ''}
+-                                onChange={(event) =>
+-                                  handleRatingFormChange(item.id, 'ulasan', event.target.value)
+-                                }
+-                                placeholder="Tulis ulasan singkat..."
+-                              />
+-                            </label>
+-                            <button type="submit" disabled={ratingSavingId === item.id}>
+-                              {ratingSavingId === item.id ? 'Menyimpan...' : 'Kirim Rating'}
++                          <div className="wisata-rating-section">
++                            <button
++                              type="button"
++                              className="wisata-rating-toggle-btn"
++                              onClick={() => setActiveRatingFormId(item.id)}
++                            >
++                              <WisataIcon name="edit" size={14} />
++                              Berikan Ulasan
+                             </button>
+-                          </form>
++                          </div>
+                         )}
+                         {canManageWisata && !item.isFallback && (
+                           <div className="wisata-card-actions">
+@@ -1966,23 +1964,6 @@ export default function WisataMapPage({ readOnly = false }) {
+                 })}
+               </div>
+             </div>
+-
+-            {!showAllWisata && displayedWisata.length > visibleWisataCards.length && (
+-              <button
+-                type="button"
+-                className="wisata-show-all-btn"
+-                onClick={handleViewAllWisata}
+-              >
+-                <WisataIcon name="plus" size={16} />
+-                Tampilkan Semua {displayedWisata.length} Lokasi Wisata
+-              </button>
+-            )}
+-          </section>
+-
+-          <section className="wisata-summary-section">
+-            <h2>Ringkasan Wisata</h2>
+-
+-            <div className="wisata-summary-grid">
+               <SummaryCard
+                 icon="pin"
+                 label="Lokasi"
+@@ -2104,18 +2085,6 @@ export default function WisataMapPage({ readOnly = false }) {
+             </button>
+             {locationStatus && (
+               <p className="wisata-location-status" aria-live="polite">
+-                {locationStatus}
+-              </p>
+-            )}
+-          </section>
+-        </aside>
+-      </section>
+-    </div>
+-  );
+-}
+-
+-function SummaryCard({ icon, label, value, text, tone }) {
+-  return (
+     <article className={`wisata-summary-card ${tone}`}>
+       <span>
+         <WisataIcon name={icon} size={21} />

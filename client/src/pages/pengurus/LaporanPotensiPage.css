@@ -521,3 +521,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+.laporan-potensi-dropdown { position: absolute; right: 0; top: 100%; margin-top: 4px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e6edf3; z-index: 50; min-width: 160px; padding: 4px; display: flex; flex-direction: column; }
+.laporan-potensi-dropdown button { padding: 8px 12px; border: none; background: transparent; text-align: left; font-size: 13px; font-weight: 600; color: #172033; cursor: pointer; border-radius: 4px; }
+.laporan-potensi-dropdown button:hover { background: #f1f5f9; }
+.laporan-potensi-dropdown button.is-danger { color: #ef1f1f; }
+.laporan-potensi-dropdown button.is-danger:hover { background: #feecec; }

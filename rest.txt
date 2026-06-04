@@ -1,0 +1,219 @@
+
+            {!showAllWisata && displayedWisata.length > visibleWisataCards.length && (
+              <button
+                type="button"
+                className="wisata-show-all-btn"
+                onClick={handleViewAllWisata}
+              >
+                <WisataIcon name="plus" size={16} />
+                Tampilkan Semua {displayedWisata.length} Lokasi Wisata
+              </button>
+            )}
+          </section>
+
+          <section className="wisata-summary-section">
+            <h2>Ringkasan Wisata</h2>
+
+            <div className="wisata-summary-grid">
+              <SummaryCard
+                icon="pin"
+                label="Lokasi"
+                value={summary.total}
+                text="Total Lokasi"
+                tone="green"
+              />
+              <SummaryCard
+                icon="ticket"
+                label="Wisata Budaya"
+                value={summary.budaya}
+                text="Total Wisata Budaya"
+                tone="blue"
+              />
+              <SummaryCard
+                icon="mountain"
+                label="Wisata Alam"
+                value={summary.alam}
+                text="Total Wisata Alam"
+                tone="orange"
+              />
+              <SummaryCard
+                icon="dots"
+                label="Wisata Buatan"
+                value={summary.buatan}
+                text="Total Wisata Buatan"
+                tone="purple"
+              />
+            </div>
+          </section>
+        </div>
+
+        <aside className="wisata-side-column">
+          <section className="wisata-filter-card">
+            <h2>Filter Wisata</h2>
+
+            <label>
+              Kategori Wisata
+              <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                <option value="semua">Semua Kategori</option>
+                <option value="alam">Alam</option>
+                <option value="buatan">Buatan</option>
+                <option value="budaya">Budaya</option>
+              </select>
+            </label>
+
+            <div className="wisata-filter-group">
+              <strong>Fasilitas</strong>
+
+              <label>
+                <input
+                  type="checkbox"
+                  checked={allFacilitiesSelected}
+                  onChange={() => handleFacilityToggle('semua')}
+                />
+                Semua Fasilitas
+              </label>
+
+              {FACILITY_OPTIONS.map((facility) => (
+                <label key={facility}>
+                  <input
+                    type="checkbox"
+                    checked={selectedFacilities.includes(facility)}
+                    onChange={() => handleFacilityToggle(facility)}
+                  />
+                  {facility}
+                </label>
+              ))}
+            </div>
+
+            <label>
+              Jarak
+              <select value={distance} onChange={(event) => setDistance(event.target.value)}>
+                <option value="semua">Semua Jarak</option>
+                <option value="10">Maks. 10 km</option>
+                <option value="50">Maks. 50 km</option>
+                <option value="100">Maks. 100 km</option>
+              </select>
+            </label>
+
+            <button type="button" onClick={handleApplyFilter}>
+              Terapkan Filter
+            </button>
+          </section>
+
+          <section className="wisata-nearest-card">
+            <h2>Lokasi Terdekat</h2>
+            <p className="wisata-nearest-note">
+              {currentLocation
+                ? 'Dihitung dari lokasi perangkat saat ini.'
+                : 'Aktifkan GPS dan beri izin lokasi browser untuk melihat jarak terdekat.'}
+            </p>
+
+            {nearestWisata.length > 0 ? (
+              <ol>
+                {nearestWisata.map((item) => (
+                  <li key={item.id}>
+                    <span>{item.name}</span>
+                    <strong>{formatDistance(item.distanceKm)}</strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="wisata-nearest-empty">
+                Jarak belum tersedia karena GPS belum aktif.
+              </p>
+            )}
+
+            <button
+              type="button"
+              className="wisata-location-btn"
+              onClick={handleUseBrowserLocation}
+              disabled={isLocating}
+            >
+              {isLocating ? 'Mendeteksi Lokasi...' : 'Gunakan Lokasi Saat Ini'}
+            </button>
+            {locationStatus && (
+              <p className="wisata-location-status" aria-live="polite">
+                {locationStatus}
+              </p>
+            )}
+          </section>
+        </aside>
+      </section>
+
+      {/* Rating Modal */}
+      {activeRatingWisata && (
+        <div className="wisata-modal-overlay" onClick={() => setActiveRatingFormId(null)}>
+          <div className="wisata-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="wisata-modal-header">
+              <h3 className="wisata-modal-title">Ulasan untuk {activeRatingWisata.name}</h3>
+              <button
+                type="button"
+                className="wisata-modal-close"
+                onClick={() => setActiveRatingFormId(null)}
+              >
+                &times;
+              </button>
+            </div>
+            <form
+              className="wisata-rating-form"
+              onSubmit={async (event) => {
+                await handleSubmitRating(event, activeRatingWisata);
+                if (ratingForms[activeRatingWisata.id]?.rating) {
+                  setActiveRatingFormId(null);
+                }
+              }}
+            >
+              <div className="wisata-rating-stars-wrapper">
+                <span className="wisata-rating-label">Penilaian Anda</span>
+                <div className="wisata-star-rating-input">
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const currentRating = Number(ratingForms[activeRatingWisata.id]?.rating || 0);
+                    return (
+                      <button
+                        key={star}
+                        type="button"
+                        className={wisata-star-btn }
+                        onClick={() => handleRatingFormChange(activeRatingWisata.id, 'rating', String(star))}
+                        title={Beri rating }
+                      >
+                        <WisataIcon name="star" size={32} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <label className="wisata-rating-textarea-wrapper">
+                <span className="wisata-rating-label">Pengalaman Anda</span>
+                <textarea
+                  value={ratingForms[activeRatingWisata.id]?.ulasan || ''}
+                  onChange={(event) =>
+                    handleRatingFormChange(activeRatingWisata.id, 'ulasan', event.target.value)
+                  }
+                  placeholder="Ceritakan pengalaman Anda mengunjungi tempat ini..."
+                />
+              </label>
+              <button type="submit" disabled={ratingSavingId === activeRatingWisata.id || !ratingForms[activeRatingWisata.id]?.rating}>
+                {ratingSavingId === activeRatingWisata.id ? 'Mengirim...' : 'Kirim Ulasan'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SummaryCard({ icon, label, value, text, tone }) {
+  return (
+    <article className={wisata-summary-card }>
+      <span>
+        <WisataIcon name={icon} size={21} />
+      </span>
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+        <small>{text}</small>
+      </div>
+    </article>
+  );
+}

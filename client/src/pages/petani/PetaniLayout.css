@@ -222,6 +222,48 @@
   height: 22px;
 }
 
+.petani-nav-group-btn {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #6b7d96;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.petani-nav-group-btn:hover {
+  background: #f3f7f6;
+  color: #315f4d;
+}
+
+.petani-nav-group.is-open .petani-nav-group-btn {
+  background: #edf5f2;
+  color: #315f4d;
+  font-weight: 850;
+}
+
+.petani-nav-chevron {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+}
+
+.petani-nav-subitems {
+  display: grid;
+  gap: 4px;
+  padding-left: 20px;
+  margin-top: 4px;
+}
+
 .petani-sidebar-logout {
   width: 100%;
   margin-top: 28px;

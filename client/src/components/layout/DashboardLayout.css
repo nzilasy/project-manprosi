@@ -340,3 +340,241 @@
     display: none;
   }
 }
+
+/* Change password dropdown button */
+.dashboard-dropdown-pwd-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-dropdown-pwd-btn:hover {
+  background: #dcfce7;
+}
+
+/* Change password modal */
+.pwd-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(6px);
+  padding: 24px;
+  animation: pwdFadeIn 0.2s ease;
+}
+
+@keyframes pwdFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pwdSlideUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.pwd-modal {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+  padding: 28px;
+  animation: pwdSlideUp 0.25s ease;
+}
+
+.pwd-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.pwd-modal-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #16a34a;
+}
+
+.pwd-modal-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.pwd-modal-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pwd-modal-header p {
+  margin: 3px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.pwd-modal-header > div:nth-child(2) {
+  flex: 1;
+}
+
+.pwd-modal-close {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.pwd-modal-close:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.pwd-modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pwd-alert {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pwd-alert-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.pwd-alert-success {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.pwd-field {
+  margin-bottom: 16px;
+}
+
+.pwd-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pwd-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pwd-input {
+  width: 100%;
+  padding: 11px 44px 11px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #111827;
+  background: #ffffff;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pwd-input:focus {
+  border-color: #4d7c6f;
+  box-shadow: 0 0 0 3px rgba(77, 124, 111, 0.1);
+}
+
+.pwd-toggle {
+  position: absolute;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.pwd-toggle:hover {
+  color: #475569;
+  background: #f8fafc;
+}
+
+.pwd-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pwd-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.pwd-btn-cancel,
+.pwd-btn-submit {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.pwd-btn-cancel {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.pwd-btn-cancel:hover {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.pwd-btn-submit {
+  border: 0;
+  background: #4d7c6f;
+  color: #ffffff;
+}
+
+.pwd-btn-submit:hover {
+  background: #3d6b5e;
+}
+
+.pwd-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -1,6 +1,6 @@
 const express = require('express');
 const { Op } = require('sequelize');
-const { Wisata, WisataRating, Lokasi, Lahan, Peternakan, KunjunganWisata } = require('../models/index');
+const { Wisata, WisataRating, Lokasi, Lahan, Peternakan, KunjunganWisata, User } = require('../models/index');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
@@ -333,7 +333,7 @@ async function listWisata(req, res) {
 router.get('/', listWisata);
 router.get('/points', listWisata);
 
-router.post('/:id/rating', authorize('masyarakat'), async (req, res) => {
+router.post('/:id/rating', authorize('masyarakat', 'petani', 'pengurus'), async (req, res) => {
   try {
     const idWisata = Number(req.params.id);
     const idUser = getAuthenticatedUserId(req);
@@ -663,6 +663,98 @@ router.delete('/:id', authorize('wisata', 'pengurus'), async (req, res) => {
       message: 'Gagal menghapus lokasi wisata.',
       error: error.message,
     });
+  }
+});
+
+
+// GET semua rating (untuk semua role)
+router.get('/ratings', authorize('wisata', 'pengurus', 'masyarakat', 'petani'), async (req, res) => {
+  try {
+    const { User, Wisata } = require('../models/index');
+    const ratings = await WisataRating.findAll({
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id_user', 'name', 'email'],
+        },
+        {
+          model: Wisata,
+          as: 'wisata',
+          attributes: ['id_wisata', 'nama_wisata'],
+        },
+      ],
+      order: [['created_at', 'DESC']],
+    });
+
+    // Attach balasan_by user info
+    const ratingsData = ratings.map(r => {
+      const plain = r.toJSON();
+      return plain;
+    });
+
+    // Get all unique balasan_by IDs
+    const balasanByIds = [...new Set(ratingsData.filter(r => r.balasan_by).map(r => r.balasan_by))];
+    let balasanUsers = {};
+    if (balasanByIds.length > 0) {
+      const users = await User.findAll({
+        where: { id_user: balasanByIds },
+        attributes: ['id_user', 'name'],
+      });
+      users.forEach(u => { balasanUsers[u.id_user] = u.name; });
+    }
+
+    const enrichedRatings = ratingsData.map(r => ({
+      ...r,
+      balasan_by_name: r.balasan_by ? (balasanUsers[r.balasan_by] || 'Pengelola') : null,
+    }));
+
+    res.json({
+      status: 'success',
+      data: enrichedRatings,
+    });
+  } catch (error) {
+    console.error('Get wisata ratings error:', error);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
+  }
+});
+
+// PUT balas ulasan (hanya pengelola wisata & pengurus)
+router.put('/ratings/:id/reply', authorize('wisata', 'pengurus'), async (req, res) => {
+  try {
+    const idRating = Number(req.params.id);
+    const idUser = getAuthenticatedUserId(req);
+    const balasan = req.body.balasan !== undefined ? String(req.body.balasan).trim() : null;
+
+    const rating = await WisataRating.findByPk(idRating);
+    if (!rating) {
+      return res.status(404).json({ message: 'Ulasan tidak ditemukan.' });
+    }
+
+    if (balasan === '') {
+      await rating.update({
+        balasan: null,
+        balasan_by: null,
+        balasan_at: null,
+      });
+    } else if (balasan !== null) {
+      await rating.update({
+        balasan,
+        balasan_by: idUser,
+        balasan_at: new Date(),
+      });
+    } else {
+      return res.status(400).json({ message: 'Balasan tidak boleh kosong.' });
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Balasan berhasil disimpan.',
+      data: rating,
+    });
+  } catch (error) {
+    console.error('Reply wisata rating error:', error);
+    res.status(500).json({ message: 'Gagal menyimpan balasan.' });
   }
 });
 

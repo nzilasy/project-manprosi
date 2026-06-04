@@ -11,8 +11,7 @@ import LandingPage from './pages/public/LandingPage';
 
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import ProfilePage from './pages/auth/ProfilePage';
 
 import { ComingSoonPage, NotFoundPage, UnauthorizedPage } from './pages/ErrorPages';
 
@@ -34,6 +33,7 @@ import MasyarakatKomoditasMapPage from './pages/masyarakat/KomoditasMapPage';
 import WisataDashboard from './pages/wisata/DashboardPage';
 import WisataKunjunganPage from './pages/wisata/KunjunganPage';
 import WisataKendalaPage from './pages/wisata/KendalaPage';
+import WisataUlasanPage from './pages/wisata/UlasanPage';
 import WisataMapPage from './pages/wisata/WisataMapPage';
 
 const queryClient = new QueryClient();
@@ -48,9 +48,12 @@ export default function App() {
 
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+            {/* Profile Route for all authenticated users */}
+            <Route element={<ProtectedRoute roles={['petani', 'pengurus', 'masyarakat', 'wisata']} />}>
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
 
             {/* Petani */}
             <Route element={<ProtectedRoute roles={['petani']} />}>
@@ -61,6 +64,7 @@ export default function App() {
                 <Route path="/petani/kendala" element={<KendalaPage />} />
                 <Route path="/petani/komoditas" element={<KomoditasMapPage />} />
                 <Route path="/petani/wisata" element={<PetaniWisataMapPage />} />
+                <Route path="/petani/ulasan" element={<WisataUlasanPage />} />
                 <Route path="/petani/rekomendasi" element={<AiChatPage />} />
               </Route>
             </Route>
@@ -85,6 +89,7 @@ export default function App() {
               <Route element={<DashboardLayout />}>
 
                 <Route path="/masyarakat/wisata" element={<MasyarakatWisataMapPage />} />
+                <Route path="/masyarakat/ulasan" element={<WisataUlasanPage />} />
                 <Route path="/masyarakat/komoditas" element={<MasyarakatKomoditasMapPage />} />
               </Route>
             </Route>
@@ -99,6 +104,7 @@ export default function App() {
                 <Route path="/wisata/pengunjung" element={<WisataKunjunganPage />} />
                 <Route path="/wisata/pengunjung/riwayat" element={<WisataKunjunganPage />} />
                 <Route path="/wisata/kendala" element={<WisataKendalaPage />} />
+                <Route path="/wisata/ulasan" element={<WisataUlasanPage />} />
                 <Route path="/wisata/lokasi" element={<WisataMapPage />} />
               </Route>
             </Route>

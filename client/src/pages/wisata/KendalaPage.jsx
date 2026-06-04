@@ -6,6 +6,7 @@ import {
   getEmptyFieldIssues,
   scrollToPageTop,
 } from '../../utils/formValidation';
+import SearchableSelect from '../../components/SearchableSelect';
 import './KendalaPage.css';
 
 const FALLBACK_IMAGE =
@@ -33,11 +34,13 @@ const STATUS_LABELS = {
   selesai: 'Selesai',
 };
 
+const TODAY = new Date().toISOString().slice(0, 10);
+
 const INITIAL_FORM = {
   id_wisata: '',
   kategori: '',
   tingkat_keparahan: 'sedang',
-  tanggal: new Date().toISOString().slice(0, 10),
+  tanggal: TODAY,
   judul: '',
   lokasi_kendala: '',
   deskripsi: '',
@@ -159,13 +162,10 @@ function KendalaIcon({ name, size = 20 }) {
 }
 
 export default function WisataKendalaPage() {
-  const fileInputRef = useRef(null);
-  const objectUrlsRef = useRef([]);
 
   const [wisataList, setWisataList] = useState([]);
   const [reports, setReports] = useState([]);
   const [form, setForm] = useState(INITIAL_FORM);
-  const [photoPreviews, setPhotoPreviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -233,12 +233,6 @@ export default function WisataKendalaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    return () => {
-      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
-
   const handleChange = (field, value) => {
     setForm((current) => ({
       ...current,
@@ -256,18 +250,9 @@ export default function WisataKendalaPage() {
     }));
   };
 
-  const clearPhotos = () => {
-    photoPreviews.forEach((item) => URL.revokeObjectURL(item.url));
-    objectUrlsRef.current = objectUrlsRef.current.filter(
-      (url) => !photoPreviews.some((item) => item.url === url),
-    );
-    setPhotoPreviews([]);
-  };
-
   const resetForm = () => {
     const firstWisata = selectedWisata || wisataList[0];
 
-    clearPhotos();
     setMessage('');
     setError('');
     setForm({
@@ -277,28 +262,7 @@ export default function WisataKendalaPage() {
     });
   };
 
-  const handlePhotoChange = (event) => {
-    const files = Array.from(event.target.files || []);
-    const remainingSlots = Math.max(0, 4 - photoPreviews.length);
-    const nextPhotos = files.slice(0, remainingSlots).map((file) => {
-      const url = URL.createObjectURL(file);
-      objectUrlsRef.current.push(url);
 
-      return {
-        name: file.name,
-        url,
-      };
-    });
-
-    setPhotoPreviews((current) => [...current, ...nextPhotos]);
-    event.target.value = '';
-  };
-
-  const removePhoto = (url) => {
-    URL.revokeObjectURL(url);
-    objectUrlsRef.current = objectUrlsRef.current.filter((item) => item !== url);
-    setPhotoPreviews((current) => current.filter((item) => item.url !== url));
-  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -331,7 +295,6 @@ export default function WisataKendalaPage() {
         judul: form.judul,
         lokasi_kendala: form.lokasi_kendala,
         deskripsi: form.deskripsi,
-        lampiran: photoPreviews.map((item) => item.name),
       });
 
       setReports((current) => [data.data, ...current]);
@@ -379,22 +342,16 @@ export default function WisataKendalaPage() {
             <div className="wisata-kendala-form-grid">
               <label>
                 Pilih Lokasi Wisata <strong>*</strong>
-                <select
+                <SearchableSelect
+                  options={wisataList.map(item => ({
+                    value: String(item.id_wisata || item.id),
+                    label: getWisataName(item)
+                  }))}
                   value={form.id_wisata}
-                  onChange={(event) => handleWisataChange(event.target.value)}
+                  onChange={handleWisataChange}
+                  placeholder="Pilih lokasi wisata"
                   disabled={loading || wisataList.length === 0}
-                >
-                  <option value="">Pilih lokasi wisata</option>
-                  {wisataList.map((item) => {
-                    const id = item.id_wisata || item.id;
-
-                    return (
-                      <option value={id} key={id}>
-                        {getWisataName(item)}
-                      </option>
-                    );
-                  })}
-                </select>
+                />
               </label>
 
               <label>
@@ -431,6 +388,7 @@ export default function WisataKendalaPage() {
                 <input
                   type="date"
                   value={form.tanggal}
+                  min={TODAY}
                   onChange={(event) => handleChange('tanggal', event.target.value)}
                 />
               </label>
@@ -454,7 +412,9 @@ export default function WisataKendalaPage() {
                   type="text"
                   value={form.lokasi_kendala}
                   onChange={(event) => handleChange('lokasi_kendala', event.target.value)}
-                  placeholder="Contoh: Area parkir, gerbang masuk, loket"
+                  placeholder="Pilih lokasi wisata terlebih dahulu..."
+                  readOnly
+                  className="read-only-input"
                 />
               </div>
             </label>
@@ -469,39 +429,6 @@ export default function WisataKendalaPage() {
               />
               <small>{form.deskripsi.length}/1000</small>
             </label>
-
-            <div className="wisata-kendala-photo-field">
-              <span>Lampiran Foto (Opsional)</span>
-              <div className="wisata-kendala-photo-list">
-                {photoPreviews.map((item) => (
-                  <div className="wisata-kendala-photo-preview" key={item.url}>
-                    <img src={item.url} alt="" />
-                    <button type="button" onClick={() => removePhoto(item.url)}>
-                      x
-                    </button>
-                  </div>
-                ))}
-
-                {photoPreviews.length < 4 && (
-                  <button
-                    type="button"
-                    className="wisata-kendala-upload"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <KendalaIcon name="upload" />
-                    Tambah Foto
-                  </button>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={handlePhotoChange}
-              />
-            </div>
 
             <div className="wisata-kendala-actions">
               <button type="button" onClick={resetForm}>

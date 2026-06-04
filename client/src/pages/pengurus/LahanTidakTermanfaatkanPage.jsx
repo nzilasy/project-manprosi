@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+
 import { komoditasService } from '../../services/komoditasService';
 import { lahanService } from '../../services/lahanService';
+import SearchableSelect from '../../components/SearchableSelect';
 import './LahanTidakTermanfaatkanPage.css';
 
 function isCoordinateText(value) {
@@ -359,24 +361,22 @@ export default function LahanTidakTermanfaatkanPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select
+        <SearchableSelect
           value={filterCommodity}
-          onChange={(e) => setFilterCommodity(e.target.value)}
-        >
-          <option value="semua">Semua Komoditas</option>
-          {commodityOptions.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <select
+          onChange={(val) => setFilterCommodity(val)}
+          options={[
+            { value: 'semua', label: 'Semua Komoditas' },
+            ...commodityOptions.map((c) => ({ value: c, label: c })),
+          ]}
+        />
+        <SearchableSelect
           value={filterLocation}
-          onChange={(e) => setFilterLocation(e.target.value)}
-        >
-          <option value="semua">Semua Lokasi</option>
-          {locationOptions.map((loc) => (
-            <option key={loc} value={loc}>{loc}</option>
-          ))}
-        </select>
+          onChange={(val) => setFilterLocation(val)}
+          options={[
+            { value: 'semua', label: 'Semua Lokasi' },
+            ...locationOptions.map((loc) => ({ value: loc, label: loc })),
+          ]}
+        />
       </section>
 
       {/* Table */}
@@ -494,7 +494,6 @@ export default function LahanTidakTermanfaatkanPage() {
               <div className="ltt-detail-grid">
                 <DetailField icon="user" label="Nama Petani" value={selectedItem.ownerName} />
                 <DetailField icon="mail" label="Email" value={selectedItem.ownerEmail} />
-                <DetailField icon="phone" label="Telepon" value={selectedItem.ownerPhone} />
               </div>
 
               {(selectedItem.catatan || selectedItem.deskripsi) && (

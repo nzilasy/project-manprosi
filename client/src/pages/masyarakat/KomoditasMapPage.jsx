@@ -8,6 +8,7 @@ import {
   useMap,
 } from 'react-leaflet';
 import { lahanService } from '../../services/lahanService';
+import SearchableSelect from '../../components/SearchableSelect';
 import './KomoditasMapPage.css';
 
 const DEFAULT_CENTER = [-6.9175, 107.6191];
@@ -467,7 +468,6 @@ function MapFocus({ items, resetKey }) {
     const positions = items.map((item) => item.position).filter(Boolean);
 
     if (positions.length === 0) {
-      map.setView(DEFAULT_CENTER, DEFAULT_MAP_ZOOM);
       return;
     }
 
@@ -824,17 +824,17 @@ export default function KomoditasMapPage() {
 
           <label className="komoditas-select-field">
             <span>Lokasi</span>
-            <select
-              value={selectedRegion}
-              onChange={(event) => setSelectedRegion(event.target.value)}
-            >
-              <option value="semua">Semua Lokasi</option>
-              {regions.map((region) => (
-                <option key={region} value={region}>
-                  {region}
-                </option>
-              ))}
-            </select>
+            <div style={{ marginTop: '4px' }}>
+              <SearchableSelect
+                options={[
+                  { value: 'semua', label: 'Semua Lokasi' },
+                  ...regions.map(region => ({ value: region, label: region }))
+                ]}
+                value={selectedRegion}
+                onChange={(value) => setSelectedRegion(value)}
+                placeholder="Pilih lokasi"
+              />
+            </div>
           </label>
 
           <button

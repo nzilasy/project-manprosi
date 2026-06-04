@@ -193,7 +193,7 @@ function createInitialChatState(config) {
 
   return {
     sessions,
-    activeSessionId: sessions.length > 0 ? sessions[0].id : null,
+    activeSessionId: null,
   };
 }
 

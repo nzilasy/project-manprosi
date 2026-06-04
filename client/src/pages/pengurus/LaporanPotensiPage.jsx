@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { kendalaWisataService } from '../../services/kendalaWisataService';
 import { lahanService } from '../../services/lahanService';
 import { laporanService } from '../../services/laporanService';
+import SearchableSelect from '../../components/SearchableSelect';
 import './LaporanPotensiPage.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -647,6 +648,7 @@ export default function LaporanPotensiPage() {
   const [error, setError] = useState('');
   const [updatingStatusId, setUpdatingStatusId] = useState('');
   const [selectedRowId, setSelectedRowId] = useState('');
+  const [menuOpenId, setMenuOpenId] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -767,6 +769,34 @@ export default function LaporanPotensiPage() {
     setPage(Math.min(Math.max(nextPage, 1), totalPages));
   };
 
+  useEffect(() => {
+    const handleClickOutside = () => setMenuOpenId('');
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleDelete = async (row) => {
+    if (!window.confirm(`Yakin ingin menghapus data "${row.title}"?`)) return;
+
+    setLoading(true);
+    try {
+      if (row.source === 'laporan' && row.sourceId) {
+        await laporanService.remove(row.sourceId);
+      } else if (row.source === 'kendala_wisata' && row.sourceId) {
+        await kendalaWisataService.remove(row.sourceId);
+      } else if (row.source === 'lahan' && row.sourceId) {
+        await lahanService.remove(row.sourceId);
+      }
+      
+      setRawRows((current) => current.filter((r) => r.id !== row.id));
+      setMessage('Data berhasil dihapus');
+    } catch (error) {
+      setError(error.response?.data?.message || 'Gagal menghapus data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleStatusChange = async (row, nextStatus) => {
     setUpdatingStatusId(row.id);
     setMessage('');
@@ -824,57 +854,49 @@ export default function LaporanPotensiPage() {
       <section className="laporan-potensi-filter-grid">
         <label>
           <span>Tahun</span>
-          <select
+          <SearchableSelect
             value={filters.year}
-            onChange={(event) => {
-              setFilters((current) => ({ ...current, year: event.target.value }));
+            onChange={(val) => {
+              setFilters((current) => ({ ...current, year: val }));
               setPage(1);
             }}
-          >
-            <option value="semua">Semua Tahun</option>
-            <option value="2026">2026</option>
-            <option value="2027">2027</option>
-            <option value="2028">2028</option>
-          </select>
+            options={[
+              { value: 'semua', label: 'Semua Tahun' },
+              { value: '2026', label: '2026' },
+              { value: '2027', label: '2027' },
+              { value: '2028', label: '2028' },
+            ]}
+          />
         </label>
 
         <label>
           <span>Lokasi</span>
-          <select
+          <SearchableSelect
             value={filters.location}
-            onChange={(event) => {
-              setFilters((current) => ({
-                ...current,
-                location: event.target.value,
-              }));
+            onChange={(val) => {
+              setFilters((current) => ({ ...current, location: val }));
               setPage(1);
             }}
-          >
-            <option value="semua">Semua Lokasi</option>
-            {locationOptions.map((location) => (
-              <option value={location} key={location}>
-                {location}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: 'semua', label: 'Semua Lokasi' },
+              ...locationOptions.map((loc) => ({ value: loc, label: loc })),
+            ]}
+          />
         </label>
 
         <label>
           <span>Jenis Potensi</span>
-          <select
+          <SearchableSelect
             value={filters.type}
-            onChange={(event) => {
-              setFilters((current) => ({ ...current, type: event.target.value }));
+            onChange={(val) => {
+              setFilters((current) => ({ ...current, type: val }));
               setPage(1);
             }}
-          >
-            <option value="semua">Semua</option>
-            {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
-              <option value={key} key={key}>
-                {config.label}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: 'semua', label: 'Semua' },
+              ...Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({ value: key, label: config.label })),
+            ]}
+          />
         </label>
 
         <button type="button" onClick={handleResetFilter}>
@@ -1009,18 +1031,43 @@ export default function LaporanPotensiPage() {
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td style={{ position: 'relative' }}>
                         <button
                           type="button"
                           className="laporan-potensi-more"
-                          aria-label={`Lihat detail ${row.title}`}
+                          aria-label={`Opsi untuk ${row.title}`}
                           onClick={(event) => {
                             event.stopPropagation();
-                            setSelectedRowId(row.id);
+                            setMenuOpenId(menuOpenId === row.id ? '' : row.id);
                           }}
                         >
                           <ReportIcon name="more" />
                         </button>
+                        {menuOpenId === row.id && (
+                          <div className="laporan-potensi-dropdown">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRowId(row.id);
+                                setMenuOpenId('');
+                              }}
+                            >
+                              Lihat Detail
+                            </button>
+                            <button
+                              type="button"
+                              className="is-danger"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(row);
+                                setMenuOpenId('');
+                              }}
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

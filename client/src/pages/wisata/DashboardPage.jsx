@@ -17,6 +17,7 @@ import {
   scrollToPageTop,
 } from '../../utils/formValidation';
 import './DashboardPage.css';
+import SearchableSelect from '../../components/SearchableSelect';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = [2026, 2027, 2028];
@@ -376,17 +377,15 @@ export default function WisataDashboard() {
             )}
             <label>
               Pilih Wisata <strong>*</strong>
-              <select
+              <SearchableSelect
+                options={wisataList.map((item) => ({
+                  value: String(item.id_wisata || item.id),
+                  label: item.nama_wisata || item.name || 'Lokasi Wisata'
+                }))}
                 value={form.id_wisata}
-                onChange={(event) => handleChange('id_wisata', event.target.value)}
-              >
-                <option value="">Pilih lokasi wisata</option>
-                {wisataList.map((item) => (
-                  <option value={item.id_wisata || item.id} key={item.id_wisata || item.id}>
-                    {item.nama_wisata || item.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => handleChange('id_wisata', value)}
+                placeholder="Pilih lokasi wisata"
+              />
             </label>
 
             <label>

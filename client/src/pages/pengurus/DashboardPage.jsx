@@ -1,24 +1,20 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  CircleMarker,
-  MapContainer,
-  Polygon,
-  Popup,
-  TileLayer,
-  useMap,
-} from 'react-leaflet';
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import { kendalaWisataService } from '../../services/kendalaWisataService';
 import { lahanService } from '../../services/lahanService';
 import { laporanService } from '../../services/laporanService';
 import './DashboardPage.css';
-
-const DEFAULT_CENTER = [-6.9175, 107.6191];
-const DEFAULT_MAP_ZOOM = 13;
-const MAX_MAP_ZOOM = 20;
-const MAX_NATIVE_TILE_ZOOM = 18;
-const ESRI_ATTRIBUTION =
-  'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
 
 const COMMODITY_CONFIG = [
   {
@@ -166,26 +162,6 @@ function DashboardIcon({ name }) {
   };
 
   return icons[name] || icons.map;
-}
-
-function MapTiles() {
-  return (
-    <>
-      <TileLayer
-        attribution={ESRI_ATTRIBUTION}
-        maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
-        maxZoom={MAX_MAP_ZOOM}
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      />
-      <TileLayer
-        attribution="Labels &copy; OpenStreetMap contributors &copy; CARTO"
-        maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
-        maxZoom={MAX_MAP_ZOOM}
-        subdomains={['a', 'b', 'c', 'd']}
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
-      />
-    </>
-  );
 }
 
 function getKomoditasText(item) {
@@ -355,42 +331,18 @@ function formatDate(value) {
 function normalizeStatus(status) {
   const value = String(status || 'baru').toLowerCase();
 
-  if (value.includes('selesai')) return 'Selesai';
-  if (value.includes('proses')) return 'Sedang Diproses';
-  return 'Menunggu Verif';
+  if (value === 'belum_diproses' || value.includes('belum') || value.includes('baru') || value.includes('menunggu')) return 'Belum di Progress';
+  if (value === 'diproses' || (value.includes('proses') && !value.includes('belum'))) return 'Sedang di Progress';
+  if (value === 'selesai' || value.includes('selesai') || value.includes('verifikasi')) return 'Sudah di Progress';
+  return 'Belum di Progress';
 }
 
 function statusClassName(status) {
   const normalized = String(status).toLowerCase();
 
-  if (normalized.includes('selesai')) return 'is-complete';
-  if (normalized.includes('proses')) return 'is-process';
+  if (normalized.includes('sudah') || normalized.includes('selesai')) return 'is-complete';
+  if (normalized.includes('sedang') || (normalized.includes('proses') && !normalized.includes('belum'))) return 'is-process';
   return 'is-waiting';
-}
-
-function MapFocus({ items }) {
-  const map = useMap();
-
-  useEffect(() => {
-    const positions = items.map((item) => item.position).filter(Boolean);
-
-    if (positions.length === 0) {
-      map.setView(DEFAULT_CENTER, DEFAULT_MAP_ZOOM);
-      return;
-    }
-
-    if (positions.length === 1) {
-      map.setView(positions[0], 16);
-      return;
-    }
-
-    map.fitBounds(positions, {
-      padding: [35, 35],
-      maxZoom: 16,
-    });
-  }, [items, map]);
-
-  return null;
 }
 
 function enrichLahan(item) {
@@ -412,30 +364,46 @@ function enrichLahan(item) {
   };
 }
 
-function mapReportRows(laporan) {
-  if (laporan.length === 0) return FALLBACK_REPORTS;
+function mapReportRows(laporan, pariwisata = []) {
+  const combined = [
+    ...laporan.map((item) => {
+      const lahan = item.lahan || item.Lahan || {};
+      const luas = lahan.luas ? `${formatArea(getAreaInHa(lahan))} ha` : '-';
+      return {
+        id: `LP-${String(item.tanggal || item.created_at || '2026').slice(0, 4)}-${String(item.id_laporan || item.id || '').padStart(3, '0')}`,
+        lokasi: lahan.nama_lahan || item.lokasi_kendala || '-',
+        jenis: item.kategori || item.judul || 'Laporan potensi',
+        luas,
+        tanggalValue: item.tanggal || item.created_at,
+        tanggal: formatDate(item.tanggal || item.created_at),
+        status: normalizeStatus(item.status),
+      };
+    }),
+    ...pariwisata.map((item) => {
+      const wisata = item.wisata || item.Wisata || {};
+      return {
+        id: `PW-${String(item.tanggal || item.created_at || '2026').slice(0, 4)}-${String(item.id_kendala_wisata || item.id || '').padStart(3, '0')}`,
+        lokasi: item.lokasi_kendala || wisata.nama_wisata || '-',
+        jenis: item.kategori || item.judul || 'Laporan pariwisata',
+        luas: '-',
+        tanggalValue: item.tanggal || item.created_at,
+        tanggal: formatDate(item.tanggal || item.created_at),
+        status: normalizeStatus(item.status),
+      };
+    })
+  ].sort((a, b) => new Date(b.tanggalValue || 0).getTime() - new Date(a.tanggalValue || 0).getTime());
 
-  return laporan.slice(0, 6).map((item) => {
-    const lahan = item.lahan || item.Lahan || {};
-    const luas = lahan.luas ? `${formatArea(getAreaInHa(lahan))} ha` : '-';
+  if (combined.length === 0) return FALLBACK_REPORTS;
 
-    return {
-      id: `LP-${String(item.tanggal || item.created_at || '2026').slice(0, 4)}-${String(
-        item.id_laporan || item.id || '',
-      ).padStart(3, '0')}`,
-      lokasi: lahan.nama_lahan || item.lokasi_kendala || '-',
-      jenis: item.kategori || item.judul || 'Laporan potensi',
-      luas,
-      tanggal: formatDate(item.tanggal || item.created_at),
-      status: normalizeStatus(item.status),
-    };
-  });
+  return combined.slice(0, 6);
 }
 
 export default function PengurusDashboard() {
   const { user } = useAuth();
   const [lahan, setLahan] = useState([]);
   const [laporan, setLaporan] = useState([]);
+  const [pariwisata, setPariwisata] = useState([]);
+  const [inactiveLahan, setInactiveLahan] = useState([]);
   const [selectedCommodity, setSelectedCommodity] = useState('semua');
   const [selectedRegion, setSelectedRegion] = useState('semua');
   const [loading, setLoading] = useState(true);
@@ -455,9 +423,11 @@ export default function PengurusDashboard() {
       setError('');
 
       try {
-        const [lahanResponse, laporanResponse] = await Promise.allSettled([
+        const [lahanResponse, laporanResponse, pariwisataResponse, inactiveLahanResponse] = await Promise.allSettled([
           lahanService.getAll(),
           laporanService.getAll({ limit: 10 }),
+          kendalaWisataService.getAll({ limit: 10 }),
+          lahanService.getInactive(),
         ]);
 
         if (!active) return;
@@ -478,9 +448,27 @@ export default function PengurusDashboard() {
           );
         }
 
+        if (pariwisataResponse.status === 'fulfilled') {
+          setPariwisata(
+            Array.isArray(pariwisataResponse.value.data?.data)
+              ? pariwisataResponse.value.data.data
+              : [],
+          );
+        }
+
+        if (inactiveLahanResponse.status === 'fulfilled') {
+          setInactiveLahan(
+            Array.isArray(inactiveLahanResponse.value.data?.data)
+              ? inactiveLahanResponse.value.data.data
+              : [],
+          );
+        }
+
         if (
           lahanResponse.status === 'rejected' &&
-          laporanResponse.status === 'rejected'
+          laporanResponse.status === 'rejected' &&
+          pariwisataResponse.status === 'rejected' &&
+          inactiveLahanResponse.status === 'rejected'
         ) {
           setError('Gagal memuat data dashboard pengurus.');
         }
@@ -538,7 +526,79 @@ export default function PengurusDashboard() {
     return new Set(enrichedLahan.map((item) => item.commodityKey)).size;
   }, [enrichedLahan]);
 
-  const reportRows = useMemo(() => mapReportRows(laporan), [laporan]);
+  const reportRows = useMemo(() => mapReportRows(laporan, pariwisata), [laporan, pariwisata]);
+
+  const chartData = useMemo(() => {
+    const counts = {};
+    enrichedLahan.forEach((item) => {
+      const name = item.commodityName;
+      counts[name] = (counts[name] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .map(([name, value]) => {
+        const config = COMMODITY_CONFIG.find((c) => c.label === name);
+        return {
+          name,
+          value,
+          fill: config ? config.color : '#94a3b8',
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  }, [enrichedLahan]);
+
+  const priorityTasks = useMemo(() => {
+    const tasks = [];
+
+    laporan.forEach((item) => {
+      const status = normalizeStatus(item.status);
+      if (status === 'Belum di Progress') {
+        tasks.push({
+          id: `LP-${item.id_laporan || item.id}`,
+          title: `Laporan: ${item.kategori || item.judul || 'Potensi'}`,
+          desc: item.lahan?.nama_lahan || item.lokasi_kendala || '-',
+          date: new Date(item.tanggal || item.created_at || 0),
+          dateFormatted: formatDate(item.tanggal || item.created_at),
+          badge: 'Petani',
+          tone: 'orange',
+          link: '/pengurus/laporan',
+        });
+      }
+    });
+
+    pariwisata.forEach((item) => {
+      const status = normalizeStatus(item.status);
+      if (status === 'Belum di Progress') {
+        tasks.push({
+          id: `PW-${item.id_kendala_wisata || item.id}`,
+          title: `Wisata: ${item.kategori || item.judul || 'Kendala'}`,
+          desc: item.lokasi_kendala || item.wisata?.nama_wisata || '-',
+          date: new Date(item.tanggal || item.created_at || 0),
+          dateFormatted: formatDate(item.tanggal || item.created_at),
+          badge: 'Pariwisata',
+          tone: 'purple',
+          link: '/pengurus/laporan',
+        });
+      }
+    });
+
+    inactiveLahan.forEach((item) => {
+      tasks.push({
+        id: `LTT-${item.id_lahan || item.id}`,
+        title: `Lahan Nonaktif: ${item.nama_lahan || 'Tanpa Nama'}`,
+        desc: item.lokasi?.nama_lokasi || 'Cek kelengkapan data',
+        date: new Date(item.updated_at || item.created_at || 0),
+        dateFormatted: formatDate(item.updated_at || item.created_at),
+        badge: 'Lahan',
+        tone: 'red',
+        link: '/pengurus/lahan-tidak-termanfaatkan',
+      });
+    });
+
+    return tasks
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+      .slice(0, 5);
+  }, [laporan, pariwisata, inactiveLahan]);
 
   const summaryCards = [
     {
@@ -556,9 +616,9 @@ export default function PengurusDashboard() {
       tone: 'orange',
     },
     {
-      label: 'Komoditas teridentifikasi',
-      value: hasLiveLahan ? commodityCount : 8,
-      note: 'Jenis komoditas',
+      label: 'Laporan Pariwisata',
+      value: pariwisata.length,
+      note: 'Data pariwisata',
       icon: 'pin',
       tone: 'purple',
     },
@@ -597,153 +657,70 @@ export default function PengurusDashboard() {
         ))}
       </section>
 
-      <section className="pengurus-map-row">
-        <div className="pengurus-map-section">
+      <section className="pengurus-analytics-row">
+        <div className="pengurus-chart-section">
           <div className="pengurus-section-heading">
-            <h2>Peta Sebaran Komoditas</h2>
+            <h2>Statistik Komoditas</h2>
           </div>
-
-          <div className="pengurus-map-filters">
-            <label>
-              <span>Pilih Komoditas</span>
-              <select
-                value={selectedCommodity}
-                onChange={(event) => setSelectedCommodity(event.target.value)}
-              >
-                <option value="semua">Semua Komoditas</option>
-                {commodityOptions.map((item) => (
-                  <option key={item.key} value={item.key}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              <span>Lokasi</span>
-              <select
-                value={selectedRegion}
-                onChange={(event) => setSelectedRegion(event.target.value)}
-              >
-                <option value="semua">Semua Lokasi</option>
-                {regionOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="pengurus-map-card">
-            <MapContainer
-              center={DEFAULT_CENTER}
-              className="pengurus-map"
-              maxZoom={MAX_MAP_ZOOM}
-              scrollWheelZoom
-              zoom={DEFAULT_MAP_ZOOM}
-            >
-              <MapTiles />
-              <MapFocus items={filteredLahan} />
-
-              {filteredLahan.map((item) => {
-                const key = item.id_lahan || item.id || item.nama_lahan;
-
-                return (
-                  <Fragment key={key}>
-                    {item.polygonPoints.length >= 3 && (
-                      <Polygon
-                        pathOptions={{
-                          color: item.commodityColor,
-                          fillColor: item.commodityColor,
-                          fillOpacity: 0.22,
-                          weight: 2,
-                        }}
-                        positions={item.polygonPoints}
-                      />
-                    )}
-
-                    {item.position && (
-                      <CircleMarker
-                        center={item.position}
-                        pathOptions={{
-                          color: '#ffffff',
-                          fillColor: item.commodityColor,
-                          fillOpacity: 0.95,
-                          weight: 2,
-                        }}
-                        radius={7}
-                      >
-                        <Popup>
-                          <div className="pengurus-map-popup">
-                            <h3>{item.nama_lahan || 'Area Potensi'}</h3>
-                            <p>{item.commodityName}</p>
-                            <dl>
-                              <div>
-                                <dt>Luas</dt>
-                                <dd>{formatArea(item.areaHa)} ha</dd>
-                              </div>
-                              <div>
-                                <dt>Lokasi</dt>
-                                <dd>{item.locationText}</dd>
-                              </div>
-                            </dl>
-                          </div>
-                        </Popup>
-                      </CircleMarker>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </MapContainer>
-
-            <div className="pengurus-map-switch">
-              <DashboardIcon name="map" />
-              <span>Semua Lahan</span>
-            </div>
-
-            <div className="pengurus-map-legend">
-              {COMMODITY_CONFIG.map((item) => (
-                <span key={item.key}>
-                  <i style={{ backgroundColor: item.color }} />
-                  {item.label}
-                </span>
-              ))}
-            </div>
-
-            {loading && <div className="pengurus-map-loading">Memuat peta...</div>}
+          <div className="pengurus-chart-card">
+            {chartData.length === 0 ? (
+              <div className="pengurus-empty">Belum ada data komoditas</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <Tooltip 
+                    cursor={{ fill: '#f1f5f9' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+            {loading && <div className="pengurus-map-loading">Memuat statistik...</div>}
           </div>
         </div>
 
-        <aside className="pengurus-action-card">
-          <h2>Aksi Cepat</h2>
-          <Link to="/pengurus/rekomendasi" className="pengurus-action-link">
-            <span className="pengurus-action-icon green">
-              <DashboardIcon name="sparkles" />
-            </span>
-            <span>
-              <strong>Rekomendasi AI</strong>
-              <small>Berdasarkan data lahan</small>
-            </span>
-          </Link>
-          <Link to="/pengurus/laporan" className="pengurus-action-link">
-            <span className="pengurus-action-icon orange">
-              <DashboardIcon name="history" />
-            </span>
-            <span>
-              <strong>Riwayat Laporan</strong>
-              <small>Lihat semua laporan yang telah dibuat</small>
-            </span>
-          </Link>
-          <Link to="/pengurus/peta" className="pengurus-action-link">
-            <span className="pengurus-action-icon red">
-              <DashboardIcon name="map" />
-            </span>
-            <span>
-              <strong>Lihat Peta Komoditas</strong>
-              <small>Lihat sebaran komoditas desa</small>
-            </span>
-          </Link>
+        <aside className="pengurus-priority-section">
+          <div className="pengurus-section-heading">
+            <h2>Perlu Tindakan Segera</h2>
+          </div>
+          <div className="pengurus-priority-card">
+            {priorityTasks.length === 0 ? (
+              <div className="pengurus-priority-empty">
+                <DashboardIcon name="sparkles" />
+                <p>Tidak ada tugas prioritas saat ini.</p>
+              </div>
+            ) : (
+              <ul className="pengurus-priority-list">
+                {priorityTasks.map((task) => (
+                  <li key={task.id} className="pengurus-priority-item">
+                    <Link to={task.link} className="pengurus-priority-link">
+                      <div className="pengurus-priority-header">
+                        <span className={`pengurus-priority-badge ${task.tone}`}>
+                          {task.badge}
+                        </span>
+                        <small>{task.dateFormatted}</small>
+                      </div>
+                      <h3>{task.title}</h3>
+                      <p>{task.desc}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="pengurus-priority-footer">
+              <Link to="/pengurus/laporan" className="pengurus-action-link-alt">
+                Lihat Semua Laporan
+              </Link>
+            </div>
+          </div>
         </aside>
       </section>
 

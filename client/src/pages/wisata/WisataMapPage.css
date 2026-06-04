@@ -451,7 +451,6 @@
 }
 
 .wisata-map-card .leaflet-popup-content {
-  width: 265px;
   margin: 0;
 }
 
@@ -547,14 +546,14 @@
 
 .wisata-popup {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  gap: 13px;
-  padding: 12px;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
 }
 
 .wisata-popup img {
-  width: 88px;
-  height: 94px;
+  width: 78px;
+  height: 84px;
   border-radius: 8px;
   object-fit: cover;
 }
@@ -658,7 +657,10 @@
 .wisata-card-actions {
   display: grid;
   gap: 8px;
-  margin-top: 12px;
+}
+
+.wisata-popup-actions.full-width {
+  grid-column: 1 / -1;
 }
 
 .wisata-edit-button,
@@ -865,15 +867,19 @@
   font-weight: 700;
 }
 
-.wisata-list-header select {
+.wisata-search-input {
   height: 34px;
-  min-width: 112px;
+  min-width: 180px;
   border: 1px solid #dbe3ea;
   border-radius: 7px;
   background: #ffffff;
-  color: #7b8796;
-  padding: 0 10px;
-  font-size: 11px;
+  color: #172033;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.wisata-search-input::placeholder {
+  color: #a0aec0;
 }
 
 .wisata-card-grid {
@@ -1001,62 +1007,242 @@
   white-space: nowrap;
 }
 
+.wisata-description-text {
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #64748b;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.wisata-description-text.popup {
+  grid-column: 1 / -1;
+  margin: 6px 0 4px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  background: #f8fafc;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-style: italic;
+}
+
+.wisata-rating-section {
+  margin-top: 14px;
+}
+
+.wisata-rating-toggle-btn {
+  width: 100%;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wisata-rating-toggle-btn:hover {
+  background: #f8fafc;
+  border-color: #577568;
+  color: #577568;
+}
+
+.wisata-rating-success-msg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 12px;
+  font-weight: 800;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Modal Overlay & Content */
+.wisata-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.wisata-modal-content {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.wisata-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.wisata-modal-title {
+  margin: 0;
+  color: #1e293b;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.wisata-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.wisata-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
 .wisata-rating-form {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #e7edf3;
+  gap: 16px;
 }
 
-.wisata-rating-form label {
+.wisata-rating-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.wisata-star-rating-input {
+  display: flex;
+  gap: 4px;
+}
+
+.wisata-star-btn {
   display: grid;
-  gap: 6px;
-  color: #334155;
-  font-size: 10px;
-  font-weight: 850;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.wisata-rating-form select,
-.wisata-rating-form textarea {
+.wisata-star-btn:hover,
+.wisata-star-btn.active {
+  color: #fbbf24;
+  transform: scale(1.1);
+}
+
+.wisata-rating-textarea-wrapper textarea {
   width: 100%;
-  border: 1px solid #dbe3ea;
+  min-height: 70px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #ffffff;
-  color: #172033;
+  color: #334155;
   font-family: inherit;
-  font-size: 11px;
-  outline: none;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s;
   box-sizing: border-box;
 }
 
-.wisata-rating-form select {
-  height: 34px;
-  padding: 0 9px;
+.wisata-rating-textarea-wrapper textarea:focus {
+  outline: none;
+  border-color: #577568;
+  box-shadow: 0 0 0 3px rgba(87, 117, 104, 0.1);
 }
 
-.wisata-rating-form textarea {
-  min-height: 58px;
-  resize: vertical;
-  padding: 9px;
-  line-height: 1.45;
+.wisata-rating-textarea-wrapper textarea::placeholder {
+  color: #94a3b8;
 }
 
-.wisata-rating-form button {
-  height: 34px;
-  border: 0;
+.wisata-rating-form button[type="submit"] {
+  width: 100%;
+  height: 38px;
+  border: none;
   border-radius: 8px;
   background: #577568;
   color: #ffffff;
   font-family: inherit;
-  font-size: 11px;
-  font-weight: 900;
+  font-size: 12px;
+  font-weight: 850;
   cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.wisata-rating-form button:disabled {
-  cursor: wait;
-  opacity: 0.7;
+.wisata-rating-form button[type="submit"]:hover:not(:disabled) {
+  background: #466055;
+}
+
+.wisata-rating-form button[type="submit"]:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
 }
 
 .wisata-show-all-btn {
