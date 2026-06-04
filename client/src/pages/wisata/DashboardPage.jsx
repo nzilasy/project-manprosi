@@ -52,6 +52,24 @@ function getWisataImage(item) {
   return item?.image || item?.photos?.[0] || item?.foto?.[0] || FALLBACK_IMAGE;
 }
 
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'Selamat pagi';
+  if (hour < 15) return 'Selamat siang';
+  if (hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
+}
+
+function getFormattedDate() {
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date());
+}
+
 function DashboardIcon({ name, size = 20 }) {
   const props = {
     viewBox: '0 0 24 24',
@@ -91,6 +109,14 @@ function DashboardIcon({ name, size = 20 }) {
         <path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" />
       </svg>
     ),
+    calendar: (
+      <svg {...props}>
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4" />
+        <path d="M8 2v4" />
+        <path d="M3 10h18" />
+      </svg>
+    ),
     plus: (
       <svg {...props}>
         <path d="M12 5v14" />
@@ -119,6 +145,9 @@ export default function WisataDashboard() {
     user?.nama_user ||
     user?.username ||
     'Pengelola Wisata';
+
+  const greeting = getGreeting();
+  const formattedDate = getFormattedDate();
 
   const chartData = useMemo(() => summary?.chart || [], [summary]);
   const popularWisata = useMemo(() => summary?.wisata_populer || [], [summary]);
@@ -249,10 +278,17 @@ export default function WisataDashboard() {
 
   return (
     <div className="wisata-dashboard">
-      <header className="wisata-dashboard-header">
-        <h1>Selamat datang, {userName}!</h1>
-        <p>Kelola data kunjungan dan kembangkan potensi wisata desa.</p>
-      </header>
+      <section className="wisata-dashboard-hero">
+        <div className="wisata-hero-content">
+          <h1>{greeting}, {userName}! 👋</h1>
+          <p>Berikut ringkasan kunjungan dan potensi wisata desa Anda</p>
+          <time>
+            <DashboardIcon name="calendar" />
+            {formattedDate}
+          </time>
+        </div>
+        <div className="wisata-hero-decoration" aria-hidden="true" />
+      </section>
 
       {message && <div className="wisata-dashboard-message success">{message}</div>}
 

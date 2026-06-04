@@ -965,20 +965,28 @@ export default function LandingPage() {
               {publicWisata.slice(0, 6).map((wisata) => (
                 <article className="landing-wisata-card" key={wisata.id}>
                   <div className="landing-wisata-image-wrap">
-                    {wisata.image ? (
+                    {wisata.image && (
                       <img
                         src={wisata.image}
-                        alt={wisata.nama_wisata}
+                        alt={wisata.nama_wisata || wisata.name || 'Wisata'}
                         className="landing-wisata-image"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          if (e.target.nextElementSibling && e.target.nextElementSibling.classList.contains('landing-wisata-placeholder')) {
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }
+                        }}
                       />
-                    ) : (
-                      <div className="landing-wisata-placeholder">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Z" />
-                          <circle cx="12" cy="9" r="2.5" />
-                        </svg>
-                      </div>
                     )}
+                    <div 
+                      className="landing-wisata-placeholder"
+                      style={{ display: wisata.image ? 'none' : 'flex' }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                    </div>
                     <span className="landing-wisata-category">
                       {wisata.jenis_wisata || wisata.category || 'Alam'}
                     </span>
