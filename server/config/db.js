@@ -13,6 +13,7 @@ const sequelize = new Sequelize(
         host: process.env.DB_HOST,
         port: process.env.DB_PORT || 3306,
         dialect: 'mysql',
+        dialectModule: require('mysql2'), // PENTING: Mencegah error "Please install mysql2" di Vercel
         logging: false,
         dialectOptions: {
             ssl: {
