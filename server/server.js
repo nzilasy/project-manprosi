@@ -250,7 +250,7 @@ async function startServer() {
     await repairLegacyPanenForeignKeys();
     await repairDuplicateUserEmailIndexes();
 
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     await repairDuplicateUserEmailIndexes();
     console.log('Semua tabel tersinkronisasi.');
 
