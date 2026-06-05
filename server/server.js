@@ -267,4 +267,13 @@ async function startServer() {
   }
 }
 
-startServer();
+if (process.env.VERCEL !== '1') {
+  startServer();
+} else {
+  // Untuk Vercel: inisialisasi database tapi tidak menjalankan app.listen()
+  sequelize.authenticate()
+    .then(() => console.log('Database terhubung (Vercel)'))
+    .catch(err => console.error('Gagal terhubung database (Vercel)', err));
+}
+
+module.exports = app;
