@@ -498,6 +498,45 @@
   border: 1px solid #fef3c7;
 }
 
+.ltt-contact-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.ltt-btn-contact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.ltt-btn-contact:hover {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+
+.ltt-btn-contact.whatsapp {
+  background: #25d366;
+  color: #ffffff;
+}
+
+.ltt-btn-contact.email {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.ltt-btn-contact svg {
+  width: 16px;
+  height: 16px;
+}
+
 .ltt-detail-notes svg {
   width: 18px;
   height: 18px;

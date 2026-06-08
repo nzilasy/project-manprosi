@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { aiService } from '../../services/aiService';
 import './AiChatPage.css';
 
@@ -36,6 +37,24 @@ const PENGURUS_DEFAULT_MESSAGES = [
       'Prioritas tindak lanjut bisa dibuat dari kombinasi dampak, urgensi, dan kesiapan sumber daya.\n\n1. Urutkan berdasarkan tingkat masalah\nDahulukan laporan yang menghambat produksi, akses lahan, atau keselamatan warga.\n\n2. Kelompokkan berdasarkan jenis potensi\nPisahkan pertanian, peternakan, pariwisata, dan lahan kosong agar keputusan lebih mudah dibandingkan.\n\n3. Gunakan data lokasi dan status\nLaporan yang lokasinya jelas dan statusnya belum diproses sebaiknya masuk daftar kerja awal.\n\n4. Buat rencana tindak lanjut\nTetapkan penanggung jawab, target waktu, dan catatan hasil verifikasi lapangan.',
     tip:
       'Gunakan data laporan terbaru sebagai dasar rapat desa, lalu tandai status laporan agar progresnya mudah dipantau.',
+    createdAt: '10:32',
+  },
+];
+
+const WISATA_DEFAULT_MESSAGES = [
+  {
+    id: 'seed-wisata-user',
+    role: 'user',
+    content: 'Bagaimana cara meningkatkan jumlah pengunjung wisata setelah musim hujan?',
+    createdAt: '10:32',
+  },
+  {
+    id: 'seed-wisata-assistant',
+    role: 'assistant',
+    content:
+      'Untuk meningkatkan pengunjung wisata setelah musim hujan, Anda bisa mencoba beberapa strategi:\n\n1. Pemeliharaan fasilitas\nPastikan akses jalan, toilet, dan fasilitas pendukung lainnya dalam keadaan bersih dan aman.\n\n2. Promosi di media sosial\nUnggah foto-foto wisata yang hijau dan segar setelah hujan. Tawarkan promo khusus atau paket keluarga.\n\n3. Adakan kegiatan baru\nBuat acara menarik seperti festival kuliner lokal, sesi foto alam, atau kegiatan edukasi agar wisatawan tertarik berkunjung kembali.',
+    tip:
+      'Gunakan data laporan kunjungan bulan lalu untuk menargetkan segmen pengunjung yang paling sering datang.',
     createdAt: '10:32',
   },
 ];
@@ -106,6 +125,39 @@ const PENGURUS_TOPICS = [
   },
 ];
 
+const WISATA_TOPICS = [
+  {
+    title: 'Manajemen Fasilitas',
+    text: 'Perawatan & perbaikan infrastruktur',
+    tone: 'green',
+    question: 'Bagaimana standar perawatan fasilitas wisata agar tetap aman dan nyaman bagi pengunjung?',
+  },
+  {
+    title: 'Pemasaran Wisata',
+    text: 'Strategi promosi & sosial media',
+    tone: 'cream',
+    question: 'Apa strategi promosi digital yang efektif untuk menarik wisatawan milenial?',
+  },
+  {
+    title: 'Penanganan Kendala',
+    text: 'Solusi untuk laporan & keluhan',
+    tone: 'blue',
+    question: 'Bagaimana cara menangani keluhan pengunjung wisata dengan baik dan profesional?',
+  },
+  {
+    title: 'Analisis Pengunjung',
+    text: 'Membaca tren & data kunjungan',
+    tone: 'orange',
+    question: 'Bagaimana membaca tren laporan pengunjung untuk menentukan musim puncak liburan?',
+  },
+  {
+    title: 'Inovasi Daya Tarik',
+    text: 'Ide atraksi & acara wisata',
+    tone: 'sky',
+    question: 'Apa ide atraksi wisata baru yang ramah lingkungan dan minim biaya?',
+  },
+];
+
 const AI_CONFIGS = {
   petani: {
     context: 'petani',
@@ -148,6 +200,27 @@ const AI_CONFIGS = {
     placeholder: 'Tanyakan tentang potensi desa, laporan, atau tindak lanjut...',
     typingText: 'AI sedang menyusun rekomendasi pengurus desa...',
     tipLabel: 'Catatan AgroAI',
+  },
+  wisata: {
+    context: 'pengelola wisata',
+    storageKeySessions: 'agrosync_wisata_ai_sessions_v1',
+    oldStorageKey: null,
+    defaultSessions: [
+      {
+        id: 'default-wisata-session-1',
+        title: 'Meningkatkan pengunjung',
+        updatedAt: Date.now(),
+        messages: WISATA_DEFAULT_MESSAGES,
+      },
+    ],
+    topics: WISATA_TOPICS,
+    heading: 'Tanya AI',
+    subtitle: 'Dapatkan rekomendasi seputar pengelolaan wisata, penanganan keluhan, dan promosi.',
+    emptyTitle: 'Mulai percakapan pengelolaan wisata',
+    emptyText: 'Pilih topik populer atau tulis pertanyaan seputar fasilitas, pengunjung, ulasan, atau promosi.',
+    placeholder: 'Tanyakan apa saja tentang pengelolaan wisata...',
+    typingText: 'AI sedang menyusun rekomendasi wisata...',
+    tipLabel: 'Tips WisataAI',
   },
 };
 
@@ -305,6 +378,8 @@ function AiIcon({ name, size = 18 }) {
 }
 
 export default function AiChatPage({ variant = 'petani' }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const config = AI_CONFIGS[variant] || AI_CONFIGS.petani;
   const [initialChatState] = useState(() => createInitialChatState(config));
   const [sessions, setSessions] = useState(initialChatState.sessions);
@@ -313,6 +388,7 @@ export default function AiChatPage({ variant = 'petani' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const textareaRef = useRef(null);
+  const hasSentInitialPrompt = useRef(false);
 
   const scrollToInput = () => {
     setTimeout(() => {
@@ -424,6 +500,22 @@ export default function AiChatPage({ variant = 'petani' }) {
     event.preventDefault();
     sendQuestion(input);
   };
+
+  useEffect(() => {
+    if (hasSentInitialPrompt.current) return;
+    
+    const searchParams = new URLSearchParams(location.search);
+    const prompt = location.state?.initialPrompt || searchParams.get('prompt');
+    
+    if (prompt) {
+      hasSentInitialPrompt.current = true;
+      // Gunakan timeout kecil agar chat tersubmit setelah UI terender
+      setTimeout(() => {
+        sendQuestion(prompt);
+      }, 100);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.search, location.state, navigate]);
 
   const handleDeleteSession = (sessionId) => {
     if (window.confirm('Yakin ingin menghapus obrolan ini?')) {

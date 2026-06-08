@@ -106,6 +106,7 @@ export default function App() {
                 <Route path="/wisata/kendala" element={<WisataKendalaPage />} />
                 <Route path="/wisata/ulasan" element={<WisataUlasanPage />} />
                 <Route path="/wisata/lokasi" element={<WisataMapPage />} />
+                <Route path="/wisata/rekomendasi" element={<AiChatPage variant="wisata" />} />
               </Route>
             </Route>
 

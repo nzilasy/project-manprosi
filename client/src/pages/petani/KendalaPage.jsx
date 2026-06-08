@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { lahanService } from '../../services/lahanService';
 import { komoditasService } from '../../services/komoditasService';
 import { panenService } from '../../services/panenService';
@@ -196,6 +197,7 @@ function KendalaIcon({ name, size = 18 }) {
 }
 
 export default function KendalaPage() {
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const objectUrlsRef = useRef([]);
 
@@ -209,6 +211,7 @@ export default function KendalaPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [aiPromptData, setAiPromptData] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -411,8 +414,20 @@ export default function KendalaPage() {
       const { data } = await laporanService.create(payload);
 
       setLaporan((current) => [data.data, ...current]);
-      setMessage(data.message || 'Laporan kendala berhasil disimpan.');
       resetForm();
+      
+      const aiPrompt = `Saya seorang petani yang sedang mengalami kendala. 
+Kategori Kendala: ${form.kategori}
+Tingkat Keparahan: ${form.tingkat_keparahan}
+Deskripsi Masalah: ${form.deskripsi}
+
+Tolong berikan rekomendasi solusi praktis dan langkah-langkah penanganan untuk masalah saya ini.`;
+
+      setAiPromptData({
+        prompt: aiPrompt,
+        successMessage: data.message || 'Laporan kendala berhasil disimpan.'
+      });
+      
     } catch (err) {
       setError(getApiErrorMessage(err, 'Gagal menyimpan laporan kendala.'));
     } finally {
@@ -711,6 +726,40 @@ export default function KendalaPage() {
           </article>
         </aside>
       </section>
+
+      {aiPromptData && (
+        <div className="kendala-modal-overlay">
+          <div className="kendala-modal">
+            <div className="kendala-modal-icon">
+              <KendalaIcon name="alert" size={32} />
+            </div>
+            <h3>Laporan Terkirim!</h3>
+            <p>
+              Apakah Anda ingin meneruskan masalah ini ke AI untuk mendapatkan rekomendasi solusi secara instan?
+            </p>
+            <div className="kendala-modal-actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setMessage(aiPromptData.successMessage);
+                  setAiPromptData(null);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                Tidak, Tutup
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => navigate(`/petani/rekomendasi?prompt=${encodeURIComponent(aiPromptData.prompt)}`)}
+              >
+                Ya, Tanya AI
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

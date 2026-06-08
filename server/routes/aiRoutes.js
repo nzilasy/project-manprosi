@@ -54,6 +54,23 @@ Aturan jawaban:
 7. Jika data belum cukup, sebutkan data tambahan yang perlu dikumpulkan.
 `;
 
+const WISATA_SYSTEM_PROMPT = `
+Kamu adalah asisten AI untuk pengelola wisata di aplikasi Agrosync/Potensi Desa.
+Tugasmu membantu pengelola wisata membaca data kunjungan, menangani kendala
+wisata, meningkatkan fasilitas, dan menyusun strategi promosi.
+
+Aturan jawaban:
+1. Jawab hanya topik pengelolaan wisata, pemasaran wisata, fasilitas, kunjungan,
+   keluhan pengunjung, dan inovasi daya tarik wisata.
+2. Jika pertanyaan di luar topik, jawab singkat bahwa kamu hanya membantu
+   seputar pengelolaan wisata desa.
+3. Gunakan bahasa Indonesia yang ramah, profesional, dan berorientasi pada layanan pelanggan.
+4. Berikan solusi konkret dan langkah-langkah praktis untuk menyelesaikan kendala.
+5. Bedakan antara data yang tersedia dari aplikasi dan saran/inferensi AI.
+6. Jangan mengarang angka kunjungan atau laporan kendala yang tidak tersedia.
+7. Jika data belum cukup, sebutkan data tambahan yang perlu dikumpulkan.
+`;
+
 function toPlain(row) {
   return row?.get ? row.get({ plain: true }) : row;
 }
@@ -426,6 +443,63 @@ async function getPengurusContext() {
   ].join('\n');
 }
 
+async function getWisataDashboardContext() {
+  const [wisataRows, kendalaWisataRows, kunjunganRows] =
+    await Promise.all([
+      Wisata.findAll({
+        include: [
+          {
+            model: Lokasi,
+            required: false,
+          },
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 12,
+      }),
+      KendalaWisata.findAll({
+        include: [
+          {
+            model: Wisata,
+            as: 'wisata',
+            include: [
+              {
+                model: Lokasi,
+                required: false,
+              },
+            ],
+            required: false,
+          },
+        ],
+        order: [['created_at', 'DESC']],
+        limit: 10,
+      }),
+      KunjunganWisata.findAll({
+        include: [
+          {
+            model: Wisata,
+            as: 'wisata',
+            required: false,
+          },
+        ],
+        order: [['tanggal_kunjungan', 'DESC']],
+        limit: 10,
+      }),
+    ]);
+
+  return [
+    'Konteks data pengelolaan wisata dari aplikasi:',
+    '',
+    'Data wisata:',
+    formatWisataContext(wisataRows),
+    '',
+    'Kendala wisata terbaru:',
+    formatKendalaWisataContext(kendalaWisataRows),
+    '',
+    'Kunjungan wisata terbaru:',
+    formatKunjunganContext(kunjunganRows),
+  ].join('\n');
+}
+
 function normalizeHistory(history) {
   if (!Array.isArray(history)) return [];
 
@@ -512,7 +586,7 @@ async function callGemini({
 }
 
 router.use(protect);
-router.use(authorize('petani', 'pengurus'));
+router.use(authorize('petani', 'pengurus', 'wisata'));
 
 router.post('/chat', async (req, res) => {
   const message = String(req.body?.message || '').trim();
@@ -538,18 +612,32 @@ router.post('/chat', async (req, res) => {
   }
 
   try {
-    const isPengurus = role === 'pengurus';
-    const context = isPengurus
-      ? await getPengurusContext()
-      : await getAgricultureContext(req.user.id);
+    let context;
+    let systemPrompt;
+    let questionLabel;
+
+    if (role === 'pengurus') {
+      context = await getPengurusContext();
+      systemPrompt = PENGURUS_SYSTEM_PROMPT;
+      questionLabel = 'Pertanyaan pengurus desa';
+    } else if (role === 'wisata') {
+      context = await getWisataDashboardContext();
+      systemPrompt = WISATA_SYSTEM_PROMPT;
+      questionLabel = 'Pertanyaan pengelola wisata';
+    } else {
+      context = await getAgricultureContext(req.user.id);
+      systemPrompt = SYSTEM_PROMPT;
+      questionLabel = 'Pertanyaan petani';
+    }
+
     const answer = await callGemini({
       apiKey,
       model,
       message,
       history,
       context,
-      systemPrompt: isPengurus ? PENGURUS_SYSTEM_PROMPT : SYSTEM_PROMPT,
-      questionLabel: isPengurus ? 'Pertanyaan pengurus desa' : 'Pertanyaan petani',
+      systemPrompt,
+      questionLabel,
     });
 
     return res.json({

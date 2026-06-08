@@ -290,6 +290,20 @@ function getYear(value) {
 function getLahanLocation(lahan) {
   const lokasi = lahan?.lokasi || lahan?.Lokasi || {};
 
+  if (lokasi.desa_kelurahan && lokasi.kecamatan) {
+    return `${lokasi.desa_kelurahan}, Kec. ${lokasi.kecamatan}, Kota Bandung`;
+  }
+  if (lokasi.desa_kelurahan) {
+    return `${lokasi.desa_kelurahan}, Kota Bandung`;
+  }
+
+  if (lahan?.desa_nama && lahan?.kecamatan_nama) {
+    return `${lahan.desa_nama}, Kec. ${lahan.kecamatan_nama}, Kota Bandung`;
+  }
+  if (lahan?.desa_nama) {
+    return `${lahan.desa_nama}, Kota Bandung`;
+  }
+
   return (
     getReadableLocation(
       lahan?.location,

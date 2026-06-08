@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { kendalaWisataService } from '../../services/kendalaWisataService';
 import { wisataService } from '../../services/wisataService';
 import {
@@ -170,6 +171,8 @@ export default function WisataKendalaPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [aiPromptData, setAiPromptData] = useState(null);
+  const navigate = useNavigate();
 
   const selectedWisata = useMemo(
     () => wisataList.find((item) => String(item.id_wisata || item.id) === String(form.id_wisata)),
@@ -298,8 +301,21 @@ export default function WisataKendalaPage() {
       });
 
       setReports((current) => [data.data, ...current]);
-      setMessage(data.message || 'Laporan kendala wisata berhasil disimpan.');
       resetForm();
+
+      const aiPrompt = `Saya seorang pengelola wisata yang sedang mengalami kendala. 
+Lokasi Wisata: ${getWisataName(selectedWisata)}
+Kategori Kendala: ${form.kategori}
+Tingkat Keparahan: ${form.tingkat_keparahan}
+Judul Kendala: ${form.judul}
+Deskripsi Masalah: ${form.deskripsi}
+
+Tolong berikan rekomendasi solusi praktis dan langkah-langkah penanganan untuk masalah operasional wisata saya ini.`;
+
+      setAiPromptData({
+        prompt: aiPrompt,
+        successMessage: data.message || 'Laporan kendala wisata berhasil disimpan.'
+      });
     } catch (err) {
       setError(getApiErrorMessage(err, 'Gagal menyimpan laporan kendala wisata.'));
     } finally {
@@ -487,6 +503,42 @@ export default function WisataKendalaPage() {
           </article>
         </aside>
       </section>
+
+      {aiPromptData && (
+        <div className="wisata-kendala-modal-overlay">
+          <div className="wisata-kendala-modal">
+            <div className="wisata-kendala-modal-icon">
+              <KendalaIcon name="check" size={32} />
+            </div>
+            <h3>Laporan Terkirim!</h3>
+            <p>
+              Apakah Anda ingin meneruskan masalah ini ke AI untuk mendapatkan rekomendasi solusi secara instan?
+            </p>
+            <div className="wisata-kendala-modal-actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setMessage(aiPromptData.successMessage);
+                  setAiPromptData(null);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                Tidak, Tutup
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  navigate('/wisata/rekomendasi', { state: { initialPrompt: aiPromptData.prompt } });
+                }}
+              >
+                Tanya Solusi ke AI
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

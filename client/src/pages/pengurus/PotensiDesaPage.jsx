@@ -388,12 +388,19 @@ function enrichPotensi(item) {
   const displayIconKey =
     statusKey === 'belum' ? STATUS_CONFIG.belum.icon : iconKey;
 
+  let locationText = formatLocationText(item.lokasi_lahan);
+  if (item.desa_nama && item.kecamatan_nama) {
+    locationText = `${item.desa_nama}, Kec. ${item.kecamatan_nama}, Kota Bandung`;
+  } else if (item.desa_nama) {
+    locationText = `${item.desa_nama}, Kota Bandung`;
+  }
+
   return {
     ...item,
     areaHa: getAreaInHa(item),
     displayIconKey,
     iconKey,
-    locationText: formatLocationText(item.lokasi_lahan),
+    locationText,
     polygon: parsePolygon(item),
     position: getPosition(item),
     statusKey,

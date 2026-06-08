@@ -2045,7 +2045,7 @@ export default function WisataMapPage({ readOnly = false }) {
                 : 'Aktifkan GPS dan beri izin lokasi browser untuk melihat jarak terdekat.'}
             </p>
 
-            {nearestWisata.length > 0 ? (
+            {nearestWisata.length > 0 && (
               <ol>
                 {nearestWisata.map((item) => (
                   <li key={item.id}>
@@ -2054,10 +2054,6 @@ export default function WisataMapPage({ readOnly = false }) {
                   </li>
                 ))}
               </ol>
-            ) : (
-              <p className="wisata-nearest-empty">
-                Jarak belum tersedia karena GPS belum aktif.
-              </p>
             )}
 
             <button type="button" onClick={handleViewAllWisata}>

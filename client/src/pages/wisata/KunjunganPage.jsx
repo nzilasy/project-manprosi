@@ -432,9 +432,17 @@ export default function KunjunganPage() {
   const chartScrollRef = useRef(null);
   const detailRef = useRef(null);
 
+  const showAllReports = location.pathname.endsWith('/riwayat');
+
+  const filteredReports = useMemo(() => {
+    if (showAllReports) return reports;
+    if (!form.id_wisata) return reports;
+    return reports.filter(r => String(r.id_wisata || r.wisata?.id_wisata) === String(form.id_wisata));
+  }, [reports, form.id_wisata, showAllReports]);
+
   const trendData = useMemo(
-    () => buildTrendData(reports, trendRange, reportYear),
-    [reports, reportYear, trendRange],
+    () => buildTrendData(filteredReports, trendRange, reportYear),
+    [filteredReports, reportYear, trendRange],
   );
   const trendRangeLabel =
     trendRange === 'year'
@@ -445,11 +453,10 @@ export default function KunjunganPage() {
   const trendAxisLabel = ['year', '6months', '12months'].includes(trendRange)
     ? 'bulan'
     : 'tanggal';
-  const showAllReports = location.pathname.endsWith('/riwayat');
   const currentMonthRange = useMemo(() => getCurrentMonthRange(), []);
   const monthlyReportRows = useMemo(
-    () => buildMonthlyReportRows(reports, reportYear),
-    [reports, reportYear],
+    () => buildMonthlyReportRows(filteredReports, reportYear),
+    [filteredReports, reportYear],
   );
   const selectedMonth = monthlyReportRows[selectedMonthIndex] || monthlyReportRows[0];
   const selectedYearTotal = monthlyReportRows.reduce(
@@ -465,9 +472,9 @@ export default function KunjunganPage() {
     () =>
       YEAR_RECAP_YEARS.map((year) => ({
         year,
-        total: getVisitorsByYear(reports, year),
+        total: getVisitorsByYear(filteredReports, year),
       })),
-    [reports],
+    [filteredReports],
   );
 
   const scrollTrendChart = (direction) => {

@@ -6,6 +6,7 @@ const {
   Komoditas,
   Panen,
   Peternakan,
+  User,
 } = require('../models/index');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -128,12 +129,18 @@ function normalizePolygon(value) {
 function getLocationText(item) {
   const lokasi = item.lokasi || item.Lokasi || {};
 
+  if (lokasi.desa_kelurahan && lokasi.kecamatan) {
+    return `${lokasi.desa_kelurahan}, Kec. ${lokasi.kecamatan}, Kota Bandung`;
+  }
+  if (lokasi.desa_kelurahan) {
+    return `${lokasi.desa_kelurahan}, Kota Bandung`;
+  }
+
   return (
     getReadableLocation(
       item.lokasi_lahan,
       lokasi.nama_lokasi,
       lokasi.nama_desa,
-      lokasi.desa_kelurahan,
       lokasi.alamat,
       lokasi.kecamatan,
       lokasi.kabupaten,
@@ -206,12 +213,15 @@ router.get('/public', async (req, res) => {
     const [lahan, peternakan] = await Promise.all([
       Lahan.findAll({
         where: {
-          latitude: {
-            [Op.ne]: null,
-          },
-          longitude: {
-            [Op.ne]: null,
-          },
+          [Op.or]: [
+            {
+              latitude: { [Op.ne]: null },
+              longitude: { [Op.ne]: null },
+            },
+            {
+              polygon_lahan: { [Op.ne]: null },
+            },
+          ],
         },
         include: includeLahan,
         order: [['created_at', 'DESC']],
@@ -226,10 +236,11 @@ router.get('/public', async (req, res) => {
 
     const lahanData = lahan
       .map((item) => {
-        const latitude = Number(item.latitude);
-        const longitude = Number(item.longitude);
+        const latitude = item.latitude !== null ? Number(item.latitude) : null;
+        const longitude = item.longitude !== null ? Number(item.longitude) : null;
 
-        if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+        // If no coordinates and no polygon, skip
+        if ((latitude === null || longitude === null) && !item.polygon_lahan) {
           return null;
         }
 
@@ -243,7 +254,8 @@ router.get('/public', async (req, res) => {
           nama_tempat: placeName,
           place_name: placeName,
           location: getLocationText(item),
-          position: [latitude, longitude],
+          position: latitude !== null && longitude !== null ? [latitude, longitude] : null,
+          polygon_lahan: item.polygon_lahan,
           status: potential.label,
           potential: potential.key,
           color: potential.color,
@@ -514,6 +526,18 @@ router.post('/', async (req, res) => {
       });
     }
 
+    if (status === 'nonaktif') {
+      const user = await User.findByPk(userId);
+      if (!user.phone && !req.body.phone) {
+        return res.status(400).json({
+          message: 'Nomor HP wajib diisi untuk menindaklanjuti lahan nonaktif.',
+        });
+      }
+      if (req.body.phone && req.body.phone !== user.phone) {
+        await user.update({ phone: req.body.phone });
+      }
+    }
+
     if (id_komoditas) {
       const komoditas = await Komoditas.findByPk(id_komoditas);
 
@@ -599,6 +623,20 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({
         message: 'Tanggal tanam terakhir wajib diisi.',
       });
+    }
+
+    const nextStatus = req.body.status ?? lahan.status;
+    if (nextStatus === 'nonaktif') {
+      const userId = getUserId(req);
+      const user = await User.findByPk(userId);
+      if (user && !user.phone && !req.body.phone) {
+        return res.status(400).json({
+          message: 'Nomor HP wajib diisi untuk menindaklanjuti lahan nonaktif.',
+        });
+      }
+      if (user && req.body.phone && req.body.phone !== user.phone) {
+        await user.update({ phone: req.body.phone });
+      }
     }
 
     await lahan.update({

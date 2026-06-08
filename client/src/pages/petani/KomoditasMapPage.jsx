@@ -177,6 +177,7 @@ function MapIcon({ name, size = 18 }) {
 
 function getKomoditasText(item) {
   return (
+    item.commodity?.[0] ||
     item.komoditas?.nama_komoditas ||
     item.Komoditas?.nama_komoditas ||
     'Tidak Diketahui'
@@ -192,10 +193,17 @@ function getReadableValue(...values) {
 }
 
 function getLocationText(item) {
+  if (item.desa_nama && item.kecamatan_nama) {
+    return `${item.desa_nama}, Kec. ${item.kecamatan_nama}, Kota Bandung`;
+  }
+  if (item.desa_nama) {
+    return `${item.desa_nama}, Kota Bandung`;
+  }
+
   return (
     getReadableValue(
-      item.nama_tempat,
       item.lokasi_lahan,
+      item.nama_tempat,
       item.lokasi?.nama_lokasi,
       item.lokasi?.nama_desa,
       item.lokasi?.alamat,
@@ -220,6 +228,8 @@ function getCoordinate(item, field) {
 }
 
 function getAreaInHa(item) {
+  if (item.area_ha !== undefined) return Number(item.area_ha);
+
   const luas = Number(item.luas || 0);
   const satuan = String(item.satuan_luas || 'ha').toLowerCase();
 
@@ -375,6 +385,10 @@ function sortPolygonPoints(points) {
 }
 
 function getLahanPosition(item) {
+  if (item.position && Array.isArray(item.position)) {
+    return item.position;
+  }
+
   const lat = getCoordinate(item, 'latitude');
   const lng = getCoordinate(item, 'longitude');
 
@@ -399,13 +413,13 @@ function getLahanPosition(item) {
 
 function getYearValue(item) {
   const source =
-    item.tanggal_tanam_terakhir || item.created_at || item.updated_at || '';
+    item.planting_date || item.tanggal_tanam_terakhir || item.created_at || item.updated_at || '';
 
   return String(source).slice(0, 4);
 }
 
 function getRegionValue(item) {
-  const location = getLocationText(item);
+  const location = item.location || getLocationText(item);
   if (isCoordinateText(location)) return 'Lokasi belum diisi';
   return location.split(',').slice(0, 2).join(',').trim() || location;
 }
@@ -454,7 +468,7 @@ function enrichLahan(item) {
     position,
     polygonPoints: getPolygonPoints(item),
     areaHa: getAreaInHa(item),
-    locationText: getLocationText(item),
+    locationText: item.location || getLocationText(item),
     year: getYearValue(item),
     region: getRegionValue(item),
   };
@@ -467,6 +481,8 @@ export default function KomoditasMapPage() {
   );
   const [selectedYear, setSelectedYear] = useState('semua');
   const [selectedRegion, setSelectedRegion] = useState('semua');
+  const [showMineOnly, setShowMineOnly] = useState(false);
+  const [myLahanIds, setMyLahanIds] = useState(new Set());
   const [selectedMapType, setSelectedMapType] = useState('satelit');
   const [resetKey, setResetKey] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -480,11 +496,18 @@ export default function KomoditasMapPage() {
       setError('');
 
       try {
-        const { data } = await lahanService.getAll();
+        const [publicRes, myRes] = await Promise.all([
+          lahanService.getPublic(),
+          lahanService.getAll().catch(() => ({ data: { data: [] } })),
+        ]);
 
         if (!active) return;
 
-        setLahan(Array.isArray(data.data) ? data.data : []);
+        const publicData = Array.isArray(publicRes.data.data) ? publicRes.data.data : [];
+        const myData = Array.isArray(myRes.data.data) ? myRes.data.data : [];
+
+        setLahan(publicData);
+        setMyLahanIds(new Set(myData.map((item) => item.id_lahan)));
       } catch (err) {
         if (!active) return;
 
@@ -507,8 +530,17 @@ export default function KomoditasMapPage() {
   }, []);
 
   const enrichedLahan = useMemo(() => {
-    return lahan.map(enrichLahan).filter(Boolean);
-  }, [lahan]);
+    return lahan
+      .map((item) => {
+        const enriched = enrichLahan(item);
+        if (!enriched) return null;
+        return {
+          ...enriched,
+          isMine: myLahanIds.has(item.id || item.id_lahan),
+        };
+      })
+      .filter(Boolean);
+  }, [lahan, myLahanIds]);
 
   const years = useMemo(() => {
     const fixedYears = ['2026', '2027', '2028'];
@@ -525,12 +557,12 @@ export default function KomoditasMapPage() {
     return enrichedLahan.filter((item) => {
       const matchCategory = selectedCategories.includes(item.commodityKey);
       const matchYear = selectedYear === 'semua' || item.year === selectedYear;
-      const matchRegion =
-        selectedRegion === 'semua' || item.region === selectedRegion;
+      const matchRegion = selectedRegion === 'semua' || item.region === selectedRegion;
+      const matchMine = !showMineOnly || item.isMine;
 
-      return matchCategory && matchYear && matchRegion;
+      return matchCategory && matchYear && matchRegion && matchMine;
     });
-  }, [enrichedLahan, selectedCategories, selectedRegion, selectedYear]);
+  }, [enrichedLahan, selectedCategories, selectedRegion, selectedYear, showMineOnly]);
 
   const summary = useMemo(() => {
     return COMMODITY_FILTERS.map((category) => {
@@ -572,6 +604,7 @@ export default function KomoditasMapPage() {
     setSelectedCategories(COMMODITY_FILTERS.map((item) => item.key));
     setSelectedYear('semua');
     setSelectedRegion('semua');
+    setShowMineOnly(false);
     setResetKey((current) => current + 1);
   };
 
@@ -603,7 +636,7 @@ export default function KomoditasMapPage() {
               <MapFocus items={filteredLahan} resetKey={resetKey} />
 
               {filteredLahan.filter((item) => item.position).map((item) => (
-                <Fragment key={item.id_lahan}>
+                <Fragment key={item.id_lahan || item.id}>
                   {item.polygonPoints.length >= 3 && (
                     <Polygon
                       positions={item.polygonPoints}
@@ -628,14 +661,23 @@ export default function KomoditasMapPage() {
                   >
                     <Popup closeButton={false}>
                       <div className="komoditas-popup">
-                        <h3>{item.nama_lahan}</h3>
+                        {item.isMine && (
+                          <div style={{ marginBottom: '6px' }}>
+                            <span style={{ fontSize: '0.75em', backgroundColor: '#e2e8f0', padding: '3px 8px', borderRadius: '4px', color: '#475569', fontWeight: 'bold' }}>
+                              Milik Saya
+                            </span>
+                          </div>
+                        )}
+                        <h3 style={{ marginTop: 0 }}>
+                          {item.nama_lahan || item.nama_tempat || 'Lahan Pertanian'}
+                        </h3>
                         <strong>{item.commodityName}</strong>
                         <p>{item.locationText}</p>
                         <dl>
                           <div>
                             <dt>Luas Lahan</dt>
                             <dd>
-                              {item.luas || '-'} {item.satuan_luas || 'ha'}
+                              {item.areaHa ? formatArea(item.areaHa) : '-'} ha
                             </dd>
                           </div>
                           <div>
@@ -654,7 +696,7 @@ export default function KomoditasMapPage() {
                             </dd>
                           </div>
                         </dl>
-                        <Link to={`/petani/lahan?detail=${item.id_lahan}`}>
+                        <Link to={`/petani/lahan?detail=${item.id_lahan || item.id}`}>
                           Lihat Detail
                         </Link>
                       </div>
@@ -755,7 +797,19 @@ export default function KomoditasMapPage() {
             ))}
           </div>
 
-          <label className="komoditas-select-field">
+          <div className="komoditas-filter-group" style={{ marginTop: '24px' }}>
+            <strong>Kepemilikan</strong>
+            <label className="komoditas-checkbox">
+              <input
+                type="checkbox"
+                checked={showMineOnly}
+                onChange={(e) => setShowMineOnly(e.target.checked)}
+              />
+              <span>Hanya Lahan Saya</span>
+            </label>
+          </div>
+
+          <label className="komoditas-select-field" style={{ marginTop: '24px' }}>
             <span>Tahun Data</span>
             <select
               value={selectedYear}

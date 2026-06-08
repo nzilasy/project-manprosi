@@ -210,11 +210,18 @@ function getPlaceName(item) {
 }
 
 function getLocationText(item) {
+  if (item.desa_nama && item.kecamatan_nama) {
+    return `${item.desa_nama}, Kec. ${item.kecamatan_nama}, Kota Bandung`;
+  }
+  if (item.desa_nama) {
+    return `${item.desa_nama}, Kota Bandung`;
+  }
+
   return (
     getReadableLocation(
-      item.nama_tempat,
       item.location,
       item.lokasi_lahan,
+      item.nama_tempat,
       item.lokasi?.nama_lokasi,
       item.lokasi?.nama_desa,
       item.lokasi?.alamat,

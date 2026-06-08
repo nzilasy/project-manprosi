@@ -7,6 +7,7 @@ import {
   Polygon,
   useMap,
   useMapEvents,
+  GeoJSON,
 } from 'react-leaflet';
 import { useLocation, useNavigate } from 'react-router-dom';
 import L from 'leaflet';
@@ -18,6 +19,8 @@ import kopiImage from '../../assets/kopi.jpeg';
 import padiImage from '../../assets/padi.jpeg';
 import peternakanImage from '../../assets/peternakan.jpeg';
 import sayuranImage from '../../assets/sayuran.jpeg';
+import SearchableSelect from '../../components/SearchableSelect';
+import { useAuth } from '../../context/AuthContext';
 
 import './LahanPage.css';
 
@@ -50,6 +53,10 @@ const defaultForm = {
   polygon_lahan: [],
   catatan: '',
   status: 'aktif',
+  kecamatan_nama: '',
+  desa_id: '',
+  desa_nama: '',
+  phone: '',
 };
 
 const markerIcon = new L.Icon({
@@ -223,6 +230,21 @@ function MapFocus({ focusPosition, focusZoom = SEARCH_MAP_ZOOM }) {
   return null;
 }
 
+function MapBounds({ bounds }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (bounds) {
+      map.flyToBounds(bounds, {
+        duration: 1.2,
+        padding: [20, 20],
+      });
+    }
+  }, [map, bounds]);
+
+  return null;
+}
+
 function stopMapEvent(event) {
   if (event.originalEvent) {
     L.DomEvent.stop(event.originalEvent);
@@ -383,6 +405,24 @@ function getPolygonPoints(item) {
   return Array.isArray(polygon) ? sortPolygonPoints(polygon) : [];
 }
 
+function getKecamatanText(item) {
+  if (item.kecamatan_nama) return item.kecamatan_nama;
+  const loc = item.lokasi_lahan || getLocationText(item);
+  if (loc && loc.includes('Kec.')) {
+    return loc.split(',')[1]?.replace('Kec.', '')?.trim() || '-';
+  }
+  return '-';
+}
+
+function getDesaText(item) {
+  if (item.desa_nama) return item.desa_nama;
+  const loc = item.lokasi_lahan || getLocationText(item);
+  if (loc && loc.includes('Kec.')) {
+    return loc.split(',')[0]?.trim() || '-';
+  }
+  return '-';
+}
+
 function getPolygonCenter(points) {
   if (!Array.isArray(points) || points.length === 0) return null;
 
@@ -439,6 +479,7 @@ function DetailInfoItem({ icon, label, value, children }) {
 }
 
 export default function LahanPage() {
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [lahan, setLahan] = useState([]);
@@ -457,6 +498,82 @@ export default function LahanPage() {
   const [placeSearchResults, setPlaceSearchResults] = useState([]);
   const [placeSearchLoading, setPlaceSearchLoading] = useState(false);
   const [mapFocusPosition, setMapFocusPosition] = useState(null);
+  const [mapFocusBounds, setMapFocusBounds] = useState(null);
+  const [villageBoundary, setVillageBoundary] = useState(null);
+  const [villages, setVillages] = useState([]);
+
+  useEffect(() => {
+    const loadAllBandungVillages = async () => {
+      try {
+        const distRes = await fetch('https://ibnux.github.io/data-indonesia/kecamatan/3273.json');
+        const districts = await distRes.json();
+        
+        const villagePromises = districts.map(async (d) => {
+          const vRes = await fetch(`https://ibnux.github.io/data-indonesia/kelurahan/${d.id}.json`);
+          const vData = await vRes.json();
+          return vData.map(v => ({ ...v, kecamatan_nama: d.nama }));
+        });
+
+        const allVillagesArrays = await Promise.all(villagePromises);
+        let allVillages = allVillagesArrays.flat();
+        
+        // Sort alphabetically
+        allVillages.sort((a, b) => a.nama.localeCompare(b.nama));
+        
+        setVillages(allVillages);
+      } catch (err) {
+        console.error('Failed to load all villages:', err);
+      }
+    };
+    
+    loadAllBandungVillages();
+  }, []);
+
+  const handleDesaChange = async (e) => {
+    const selectedId = e.target?.value || e;
+    const selectedVillage = villages.find(v => v.id === selectedId);
+    
+    setForm(prev => ({
+      ...prev,
+      desa_id: selectedId,
+      desa_nama: selectedVillage ? selectedVillage.nama : '',
+      kecamatan_nama: selectedVillage ? selectedVillage.kecamatan_nama : '',
+    }));
+
+    if (selectedVillage) {
+      setVillageBoundary(null);
+      setMapFocusBounds(null);
+      
+      try {
+        const query = `${selectedVillage.nama}, Bandung, Indonesia`;
+        const params = new URLSearchParams({
+          q: query,
+          format: 'json',
+          polygon_geojson: '1',
+          limit: '1'
+        });
+        
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+        const data = await res.json();
+        
+        if (data && data.length > 0) {
+          const result = data.find(r => r.type === 'administrative' || r.class === 'boundary') || data[0];
+          if (result.geojson) {
+            setVillageBoundary(result.geojson);
+          }
+          if (result.boundingbox) {
+            const [latMin, latMax, lonMin, lonMax] = result.boundingbox;
+            setMapFocusBounds([
+              [Number(latMin), Number(lonMin)],
+              [Number(latMax), Number(lonMax)]
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load village boundaries:', err);
+      }
+    }
+  };
 
   const requestedDetailId = useMemo(() => {
     return new URLSearchParams(location.search).get('detail');
@@ -541,7 +658,7 @@ export default function LahanPage() {
 
   const resetEditorState = () => {
     setEditingId(null);
-    setForm(defaultForm);
+    setForm({ ...defaultForm, phone: user?.phone || '' });
     setPolygonPoints([]);
     setPlaceSearchQuery('');
     setPlaceSearchResults([]);
@@ -553,6 +670,12 @@ export default function LahanPage() {
     const savedPolygon = getPolygonPoints(item);
     const locationText = getLocationText(item);
     const placeName = getPlaceName(item);
+    
+    let matchingVillage = null;
+    const itemDesaName = item.desa_nama || (item.lokasi_lahan && item.lokasi_lahan.includes('Kec.') ? item.lokasi_lahan.split(',')[0]?.trim() : null);
+    if (itemDesaName) {
+      matchingVillage = villages.find(v => v.nama.toLowerCase() === itemDesaName.toLowerCase());
+    }
 
     setEditingId(item.id_lahan);
     setPolygonPoints(savedPolygon);
@@ -571,11 +694,25 @@ export default function LahanPage() {
       polygon_lahan: savedPolygon,
       catatan: item.catatan || item.deskripsi || '',
       status: item.status || 'aktif',
+      kecamatan_id: item.kecamatan_id || (matchingVillage ? matchingVillage.kecamatan_id : ''),
+      kecamatan_nama: item.kecamatan_nama || (matchingVillage ? matchingVillage.kecamatan_nama : ''),
+      desa_id: item.desa_id || (matchingVillage ? matchingVillage.id : ''),
+      desa_nama: item.desa_nama || (matchingVillage ? matchingVillage.nama : ''),
+      phone: user?.phone || '',
     });
 
     setPlaceSearchQuery(locationText === 'Lokasi belum diisi' ? '' : locationText);
     setPlaceSearchResults([]);
-    setMapFocusPosition(null);
+    
+    const lat = getCoordinate(item, 'latitude');
+    const lon = getCoordinate(item, 'longitude');
+    if (lat && lon) {
+      setMapFocusPosition([Number(lat), Number(lon)]);
+    } else if (savedPolygon.length > 0) {
+      setMapFocusPosition(getPolygonCenter(savedPolygon));
+    } else {
+      setMapFocusPosition(null);
+    }
   };
 
   useEffect(() => {
@@ -894,8 +1031,20 @@ export default function LahanPage() {
       return;
     }
 
+    if (form.status === 'nonaktif' && !form.phone?.trim()) {
+      setMessage('Nomor HP (WhatsApp) wajib diisi agar Pengurus Desa dapat menindaklanjuti lahan nonaktif Anda.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (!form.id_komoditas) {
       setMessage('Komoditas utama wajib dipilih.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (!form.desa_id) {
+      setMessage('Pilih Desa/Kelurahan lokasi lahan Anda.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -949,13 +1098,14 @@ export default function LahanPage() {
       const nextLongitude = form.longitude || savedLongitude;
       const orderedPayloadPolygon = sortPolygonPoints(polygonPoints);
 
+      const generatedLocation = `${form.desa_nama}, Kec. ${form.kecamatan_nama}, Kota Bandung`;
+
       const payload = {
         ...form,
         nama_tempat: namaTempat,
         id_komoditas: form.id_komoditas || null,
         luas: Number(form.luas),
-        lokasi_lahan:
-          form.lokasi_lahan || (hasSavedLocationText ? savedLocationText : null),
+        lokasi_lahan: generatedLocation,
         latitude: nextLatitude ? Number(nextLatitude) : null,
         longitude: nextLongitude ? Number(nextLongitude) : null,
         polygon_lahan: orderedPayloadPolygon.length >= 3 ? orderedPayloadPolygon : null,
@@ -1173,11 +1323,23 @@ export default function LahanPage() {
                   <DetailInfoItem
                     icon={<LahanIcon name="location" size={20} />}
                     label="Lokasi Lahan"
-                    value={getLocationText(selectedDetail)}
+                    value={selectedDetail.lokasi_lahan || getLocationText(selectedDetail)}
                   />
                 </div>
 
                 <div className="lahan-info-column">
+                  <DetailInfoItem
+                    icon={<LahanIcon name="location" size={20} />}
+                    label="Desa / Kelurahan"
+                    value={getDesaText(selectedDetail)}
+                  />
+
+                  <DetailInfoItem
+                    icon={<LahanIcon name="location" size={20} />}
+                    label="Kecamatan"
+                    value={getKecamatanText(selectedDetail)}
+                  />
+
                   <DetailInfoItem
                     icon={<LahanIcon name="status" size={20} />}
                     label="Status Lahan"
@@ -1282,6 +1444,25 @@ export default function LahanPage() {
               <MapFocus
                 focusPosition={mapFocusPosition}
               />
+
+              {mapFocusBounds && (
+                <MapBounds bounds={mapFocusBounds} />
+              )}
+
+              {villageBoundary && (
+                <GeoJSON
+                  key={JSON.stringify(villageBoundary)}
+                  data={villageBoundary}
+                  style={{
+                    color: '#6366f1',
+                    weight: 2,
+                    opacity: 0.6,
+                    fillColor: '#6366f1',
+                    fillOpacity: 0.08,
+                  }}
+                  interactive={false}
+                />
+              )}
 
               {/* Polygon lahan tersimpan selain yang sedang diedit */}
               {visibleLahan.map((item) => {
@@ -1585,6 +1766,8 @@ export default function LahanPage() {
                 </div>
               </label>
 
+
+
               <div className="lahan-location-field">
                 <label htmlFor="place_search">Patokan Lokasi</label>
 
@@ -1640,6 +1823,17 @@ export default function LahanPage() {
                 />
               </label>
 
+              <label>
+                Desa / Kelurahan (Kota Bandung)
+                <SearchableSelect
+                  options={villages.map(v => ({ value: v.id, label: `${v.nama} - (Kec. ${v.kecamatan_nama})` }))}
+                  value={form.desa_id}
+                  onChange={(val) => handleDesaChange({ target: { value: val } })}
+                  disabled={loading || villages.length === 0}
+                  placeholder={villages.length === 0 ? 'Memuat 151 Kelurahan...' : 'Pilih Desa/Kelurahan...'}
+                />
+              </label>
+
               <div className="lahan-coordinate-grid">
                 <label>
                   Latitude
@@ -1689,6 +1883,23 @@ export default function LahanPage() {
                   <option value="nonaktif">Nonaktif</option>
                 </select>
               </label>
+
+              {form.status === 'nonaktif' && (
+                <label>
+                  Nomor HP (WhatsApp)
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    placeholder="Contoh: 081234567890"
+                    required
+                  />
+                  <small style={{ color: '#71839a', marginTop: '4px', display: 'block', fontSize: '11px', lineHeight: '1.4' }}>
+                    Nomor HP wajib diisi agar Pengurus Desa dapat menghubungi dan menindaklanjuti lahan nonaktif Anda.
+                  </small>
+                </label>
+              )}
 
               <label>
                 Catatan Opsional

@@ -380,39 +380,8 @@ export default function PetaniDashboard() {
     return activities.slice(0, 5);
   }, [panenData, laporanData, lahanData]);
 
-  /* ── Fallback activities if no data ── */
-  const displayActivities = recentActivities.length > 0
-    ? recentActivities
-    : [
-        {
-          type: 'Panen',
-          title: 'Panen jagung dicatat',
-          meta: '4,2 ton • 20 Mei 2026',
-          tone: 'green',
-          to: '/petani/panen',
-        },
-        {
-          type: 'Kendala',
-          title: 'Hama wereng dilaporkan',
-          meta: 'Lahan Padi Ciherang • Perlu dipantau',
-          tone: 'red',
-          to: '/petani/kendala',
-        },
-        {
-          type: 'Lahan',
-          title: 'Lahan D-4 diperbarui',
-          meta: 'Jagung • 1,2 ha',
-          tone: 'blue',
-          to: '/petani/lahan',
-        },
-        {
-          type: 'Lokasi',
-          title: 'Titik lahan berhasil disimpan',
-          meta: 'Koordinat dan batas lahan sudah tersedia',
-          tone: 'orange',
-          to: '/petani/lahan',
-        },
-      ];
+  /* ── No fallback activities ── */
+  const displayActivities = recentActivities;
 
   const farmerActions = [
     {
@@ -524,25 +493,32 @@ export default function PetaniDashboard() {
           </div>
 
           <div className="petani-activity-list">
-            {displayActivities.map((activity) => (
-              <Link
-                className="petani-activity-item"
-                key={`${activity.type}-${activity.title}`}
-                to={activity.to}
-              >
-                <span className={`petani-activity-dot ${activity.tone}`} />
+            {displayActivities.length > 0 ? (
+              displayActivities.map((activity) => (
+                <Link
+                  className="petani-activity-item"
+                  key={`${activity.type}-${activity.title}-${activity.date}`}
+                  to={activity.to}
+                >
+                  <span className={`petani-activity-dot ${activity.tone}`} />
 
-                <span className="petani-activity-copy">
-                  <strong>{activity.title}</strong>
-                  <small>{activity.meta}</small>
-                  <span className={`petani-activity-badge ${activity.tone}`}>
-                    {activity.type}
+                  <span className="petani-activity-copy">
+                    <strong>{activity.title}</strong>
+                    <small>{activity.meta}</small>
+                    <span className={`petani-activity-badge ${activity.tone}`}>
+                      {activity.type}
+                    </span>
                   </span>
-                </span>
 
-                <span className="petani-activity-arrow">›</span>
-              </Link>
-            ))}
+                  <span className="petani-activity-arrow">›</span>
+                </Link>
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: '#64748b' }}>
+                <p>Belum ada aktivitas terbaru.</p>
+                <small>Mulai tambahkan lahan atau laporkan panen Anda!</small>
+              </div>
+            )}
           </div>
         </article>
 

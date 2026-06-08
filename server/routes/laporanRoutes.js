@@ -296,4 +296,38 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const laporan = await Laporan.findByPk(req.params.id);
+
+    if (!laporan) {
+      return res.status(404).json({
+        message: 'Laporan tidak ditemukan.',
+      });
+    }
+
+    const role = getUserRole(req);
+    const userId = getUserId(req);
+
+    if (role === 'petani' && laporan.id_user !== userId) {
+      return res.status(403).json({
+        message: 'Akses ditolak. Anda hanya dapat menghapus laporan Anda sendiri.',
+      });
+    }
+
+    await laporan.destroy();
+
+    return res.json({
+      message: 'Laporan berhasil dihapus.',
+    });
+  } catch (error) {
+    console.error('Delete laporan error:', error);
+
+    return res.status(500).json({
+      message: 'Gagal menghapus laporan.',
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

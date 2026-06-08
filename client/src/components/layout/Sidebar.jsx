@@ -94,6 +94,12 @@ const navByRole = {
         { to: '/wisata/lokasi', label: 'Lokasi Wisata', icon: 'map-pin' },
       ],
     },
+    {
+      group: 'AI',
+      items: [
+        { to: '/wisata/rekomendasi', label: 'Tanya AI', icon: 'chat' },
+      ],
+    },
   ],
 };
 

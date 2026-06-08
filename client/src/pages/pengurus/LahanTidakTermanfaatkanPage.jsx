@@ -14,10 +14,17 @@ function getReadableLocation(...values) {
 }
 
 function getLocationText(item) {
+  if (item.desa_nama && item.kecamatan_nama) {
+    return `${item.desa_nama}, Kec. ${item.kecamatan_nama}, Kota Bandung`;
+  }
+  if (item.desa_nama) {
+    return `${item.desa_nama}, Kota Bandung`;
+  }
+
   const lokasi = item.lokasi || item.Lokasi || {};
   return getReadableLocation(
-    item.nama_tempat,
     item.lokasi_lahan,
+    item.nama_tempat,
     lokasi.nama_lokasi,
     lokasi.nama_desa,
     lokasi.desa_kelurahan,
@@ -165,6 +172,11 @@ function LTTIcon({ name }) {
         <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 2.07 4.18 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72c.13.81.36 1.6.68 2.34a2 2 0 0 1-.45 2.11L8.09 9.31a16 16 0 0 0 6.6 6.6l1.14-1.14a2 2 0 0 1 2.11-.45c.74.32 1.53.55 2.34.68A2 2 0 0 1 22 16.92Z" />
       </svg>
     ),
+    whatsapp: (
+      <svg {...common}>
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+      </svg>
+    ),
     calendar: (
       <svg {...common}>
         <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -199,6 +211,56 @@ function DetailField({ icon, label, value }) {
   );
 }
 
+function formatPhoneForWA(phone) {
+  if (!phone || phone === '-') return null;
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) {
+    return '62' + cleaned.substring(1);
+  }
+  return cleaned;
+}
+
+const LOCAL_STATUS_STORAGE_KEY = 'pengurus_laporan_potensi_status_overrides';
+
+const REPORT_STATUS_OPTIONS = [
+  { value: 'belum_diproses', label: 'Belum di Progress', color: '#dc2626', bg: '#fef2f2' },
+  { value: 'diproses', label: 'Sedang di Progress', color: '#ea580c', bg: '#fff7ed' },
+  { value: 'selesai', label: 'Sudah di Progress', color: '#16a34a', bg: '#f0fdf4' },
+];
+
+function normalizeReportStatus(value) {
+  const status = String(value || '').toLowerCase();
+  if (status === 'selesai' || status.includes('selesai') || status.includes('verifikasi')) {
+    return 'selesai';
+  }
+  if (status === 'diproses' || status.includes('proses')) {
+    return 'diproses';
+  }
+  return 'belum_diproses';
+}
+
+function readStoredStatuses() {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const storedValue = localStorage.getItem(LOCAL_STATUS_STORAGE_KEY);
+    return storedValue ? JSON.parse(storedValue) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredStatus(rowId, status) {
+  if (typeof localStorage === 'undefined') return;
+  const currentStatuses = readStoredStatuses();
+  localStorage.setItem(
+    LOCAL_STATUS_STORAGE_KEY,
+    JSON.stringify({
+      ...currentStatuses,
+      [rowId]: normalizeReportStatus(status),
+    }),
+  );
+}
+
 export default function LahanTidakTermanfaatkanPage() {
   const [lahanList, setLahanList] = useState([]);
   const [allCommodities, setAllCommodities] = useState([]);
@@ -208,6 +270,12 @@ export default function LahanTidakTermanfaatkanPage() {
   const [filterCommodity, setFilterCommodity] = useState('semua');
   const [filterLocation, setFilterLocation] = useState('semua');
   const [selectedId, setSelectedId] = useState(null);
+  const [statusOverrides, setStatusOverrides] = useState(readStoredStatuses());
+
+  const handleUpdateStatus = (item, nextStatus) => {
+    writeStoredStatus(item.rowId, nextStatus);
+    setStatusOverrides(readStoredStatuses());
+  };
 
   useEffect(() => {
     let active = true;
@@ -245,19 +313,30 @@ export default function LahanTidakTermanfaatkanPage() {
   }, []);
 
   const enrichedList = useMemo(() => {
-    return lahanList.map((item) => ({
-      ...item,
-      locationText: getLocationText(item),
-      commodityName: getCommodityName(item),
-      ownerName: getOwnerName(item),
-      ownerEmail: getOwnerEmail(item),
-      ownerPhone: getOwnerPhone(item),
-      areaHa: getAreaInHa(item),
-      areaLabel: `${formatArea(getAreaInHa(item))} ha`,
-      inactiveSince: getTimeSince(item.updated_at),
-      lastPlanting: formatDate(item.tanggal_tanam_terakhir),
-    }));
-  }, [lahanList]);
+    return lahanList.map((item) => {
+      const itemRowId = `lahan-kosong-${item.id_lahan || item.id}`;
+      const statusValue = normalizeReportStatus(statusOverrides[itemRowId] || item.status_laporan || 'belum_diproses');
+      const statusOption = REPORT_STATUS_OPTIONS.find(opt => opt.value === statusValue) || REPORT_STATUS_OPTIONS[0];
+
+      return {
+        ...item,
+        rowId: itemRowId,
+        statusValue,
+        statusLabel: statusOption.label,
+        statusColor: statusOption.color,
+        statusBg: statusOption.bg,
+        locationText: getLocationText(item),
+        commodityName: getCommodityName(item),
+        ownerName: getOwnerName(item),
+        ownerEmail: getOwnerEmail(item),
+        ownerPhone: getOwnerPhone(item),
+        areaHa: getAreaInHa(item),
+        areaLabel: `${formatArea(getAreaInHa(item))} ha`,
+        inactiveSince: getTimeSince(item.updated_at),
+        lastPlanting: formatDate(item.tanggal_tanam_terakhir),
+      };
+    });
+  }, [lahanList, statusOverrides]);
 
   const commodityOptions = useMemo(() => {
     const apiNames = allCommodities.map((c) => c.nama_komoditas).filter(Boolean);
@@ -402,6 +481,7 @@ export default function LahanTidakTermanfaatkanPage() {
                   <th>Luas</th>
                   <th>Lokasi</th>
                   <th>Nonaktif Sejak</th>
+                  <th>Status</th>
                   <th />
                 </tr>
               </thead>
@@ -432,6 +512,11 @@ export default function LahanTidakTermanfaatkanPage() {
                       <span className="ltt-time-badge">
                         <LTTIcon name="clock" />
                         {item.inactiveSince}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="ltt-status-badge" style={{ background: item.statusBg, color: item.statusColor, fontSize: '11px', padding: '4px 8px' }}>
+                        {item.statusLabel}
                       </span>
                     </td>
                     <td>
@@ -474,9 +559,28 @@ export default function LahanTidakTermanfaatkanPage() {
             </button>
 
             <div className="ltt-modal-header">
-              <span className="ltt-status-badge">Nonaktif</span>
-              <h2>{selectedItem.nama_lahan || 'Lahan'}</h2>
-              <p>{selectedItem.commodityName} • {selectedItem.areaLabel}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <span className="ltt-status-badge" style={{ background: selectedItem.statusBg, color: selectedItem.statusColor }}>
+                    {selectedItem.statusLabel}
+                  </span>
+                  <h2>{selectedItem.nama_lahan || 'Lahan'}</h2>
+                  <p>{selectedItem.commodityName} • {selectedItem.areaLabel}</p>
+                </div>
+
+                <div className="ltt-status-updater" style={{ textAlign: 'right', marginRight: '32px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>Status Tindak Lanjut</label>
+                  <select 
+                    value={selectedItem.statusValue}
+                    onChange={(e) => handleUpdateStatus(selectedItem, e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #dce5ed', fontSize: '13px', fontWeight: 700, color: '#344256', outline: 'none', cursor: 'pointer' }}
+                  >
+                    {REPORT_STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div className="ltt-modal-body">
@@ -493,7 +597,31 @@ export default function LahanTidakTermanfaatkanPage() {
               <h3>Informasi Pemilik</h3>
               <div className="ltt-detail-grid">
                 <DetailField icon="user" label="Nama Petani" value={selectedItem.ownerName} />
+                <DetailField icon="phone" label="No. Telepon" value={selectedItem.ownerPhone} />
                 <DetailField icon="mail" label="Email" value={selectedItem.ownerEmail} />
+              </div>
+
+              <div className="ltt-contact-actions">
+                {formatPhoneForWA(selectedItem.ownerPhone) && (
+                  <a
+                    href={`https://wa.me/${formatPhoneForWA(selectedItem.ownerPhone)}?text=Halo Bapak/Ibu ${encodeURIComponent(selectedItem.ownerName)}, saya Pengurus Desa ingin menanyakan mengenai lahan ${encodeURIComponent(selectedItem.nama_lahan)} yang saat ini berstatus nonaktif.`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ltt-btn-contact whatsapp"
+                  >
+                    <LTTIcon name="whatsapp" />
+                    Hubungi via WhatsApp
+                  </a>
+                )}
+                {selectedItem.ownerEmail !== '-' && (
+                  <a
+                    href={`mailto:${selectedItem.ownerEmail}?subject=Pemberitahuan Lahan Nonaktif: ${selectedItem.nama_lahan}`}
+                    className="ltt-btn-contact email"
+                  >
+                    <LTTIcon name="mail" />
+                    Kirim Email
+                  </a>
+                )}
               </div>
 
               {(selectedItem.catatan || selectedItem.deskripsi) && (
