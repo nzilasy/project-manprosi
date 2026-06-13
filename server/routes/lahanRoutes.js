@@ -30,15 +30,7 @@ const includeLahan = [
 const includePeternakan = [
   {
     model: Lokasi,
-    required: true,
-    where: {
-      latitude: {
-        [Op.ne]: null,
-      },
-      longitude: {
-        [Op.ne]: null,
-      },
-    },
+    required: false,
   },
 ];
 
@@ -212,25 +204,14 @@ router.get('/public', async (req, res) => {
   try {
     const [lahan, peternakan] = await Promise.all([
       Lahan.findAll({
-        where: {
-          [Op.or]: [
-            {
-              latitude: { [Op.ne]: null },
-              longitude: { [Op.ne]: null },
-            },
-            {
-              polygon_lahan: { [Op.ne]: null },
-            },
-          ],
-        },
         include: includeLahan,
         order: [['created_at', 'DESC']],
-        limit: 100,
+        limit: 500,
       }),
       Peternakan.findAll({
         include: includePeternakan,
         order: [['created_at', 'DESC']],
-        limit: 100,
+        limit: 500,
       }),
     ]);
 
@@ -239,10 +220,8 @@ router.get('/public', async (req, res) => {
         const latitude = item.latitude !== null ? Number(item.latitude) : null;
         const longitude = item.longitude !== null ? Number(item.longitude) : null;
 
-        // If no coordinates and no polygon, skip
-        if ((latitude === null || longitude === null) && !item.polygon_lahan) {
-          return null;
-        }
+        // Don't skip if no coordinates, just let position be null
+        // so it still shows up in stats and commodities dropdown
 
         const komoditas = item.komoditas?.nama_komoditas || 'Belum dipilih';
         const potential = getPotentialStatus(item);
@@ -276,7 +255,7 @@ router.get('/public', async (req, res) => {
         const longitude = Number(lokasi.longitude);
 
         if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-          return null;
+          // let it pass with null coordinates
         }
 
         const placeName = getPlaceName(item);
@@ -290,7 +269,7 @@ router.get('/public', async (req, res) => {
           nama_tempat: placeName,
           place_name: placeName,
           location: getLocationText(item),
-          position: [latitude, longitude],
+          position: (!Number.isNaN(latitude) && !Number.isNaN(longitude) && latitude && longitude) ? [latitude, longitude] : null,
           status: item.status || 'Aktif',
           potential: 'peternakan',
           color: '#0f766e',

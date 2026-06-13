@@ -192,9 +192,7 @@ function serializeWisata(row) {
   const longitude = Number(lokasi?.longitude);
   const photos = parseList(item.foto);
 
-  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-    return null;
-  }
+  // Do not drop Wisata data if latitude/longitude is missing. Let it pass with null position.
 
   return {
     id: item.id_wisata,
@@ -218,9 +216,9 @@ function serializeWisata(row) {
     status: item.status || 'aktif',
     location: getLocationText(lokasi),
     address: lokasi?.alamat || getLocationText(lokasi),
-    position: [latitude, longitude],
-    latitude,
-    longitude,
+    position: (!Number.isNaN(latitude) && !Number.isNaN(longitude) && lokasi?.latitude !== null && lokasi?.longitude !== null) ? [latitude, longitude] : null,
+    latitude: !Number.isNaN(latitude) ? latitude : null,
+    longitude: !Number.isNaN(longitude) ? longitude : null,
     lokasi,
     created_at: item.created_at,
     updated_at: item.updated_at,

@@ -720,9 +720,11 @@ export default function LandingPage() {
                 maxNativeZoom={MAX_NATIVE_TILE_ZOOM}
               />
 
-              <LandingMapFocus regions={filteredRegions} focusPosition={mapFocusPosition} />
+              <LandingMapFocus regions={filteredRegions.filter((r) => r.position)} focusPosition={mapFocusPosition} />
 
-              {filteredRegions.map((region, index) => {
+              {filteredRegions
+                .filter((region) => region.position)
+                .map((region, index) => {
                 const mainCommodity = (region.commodity || [])[0] || '';
                 const markerColor = getCommodityColor(mainCommodity);
 

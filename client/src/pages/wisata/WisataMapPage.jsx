@@ -779,7 +779,7 @@ export default function WisataMapPage({ readOnly = false }) {
   }, []);
 
   const allWisata = useMemo(() => {
-    return wisata.map(normalizeWisata).filter((item) => item.position);
+    return wisata.map(normalizeWisata);
   }, [wisata]);
 
   const enrichedWisata = useMemo(() => {
@@ -1702,7 +1702,7 @@ export default function WisataMapPage({ readOnly = false }) {
                 onPick={handlePickAddLocation}
               />
 
-              {filteredWisata.map((item) => {
+              {filteredWisata.filter(item => item.position).map((item) => {
                 const config = getCategoryConfig(item.category);
                 const markerIcon = createWisataMarkerIcon(config);
 
