@@ -7,6 +7,7 @@ import {
   Popup,
   useMap,
 } from 'react-leaflet';
+import api from '../../services/api';
 
 import heroImage from '../../assets/orang_petani.jpeg';
 import agrosyncLogo from '../../assets/Logo_project.jpeg';
@@ -200,25 +201,25 @@ export default function LandingPage() {
 
       try {
         const [lahanRes, wisataRes, panenRes] = await Promise.allSettled([
-          fetch('/api/lahan/public'),
-          fetch('/api/wisata/public'),
-          fetch('/api/panen/public-summary'),
+          api.get('/lahan/public'),
+          api.get('/wisata/public'),
+          api.get('/panen/public-summary'),
         ]);
 
         if (ignore) return;
 
-        if (lahanRes.status === 'fulfilled' && lahanRes.value.ok) {
-          const result = await lahanRes.value.json();
+        if (lahanRes.status === 'fulfilled' && lahanRes.value.data) {
+          const result = lahanRes.value.data;
           setPublicLahan(Array.isArray(result.data) ? result.data : []);
         }
 
-        if (wisataRes.status === 'fulfilled' && wisataRes.value.ok) {
-          const result = await wisataRes.value.json();
+        if (wisataRes.status === 'fulfilled' && wisataRes.value.data) {
+          const result = wisataRes.value.data;
           setPublicWisata(Array.isArray(result.data) ? result.data : []);
         }
 
-        if (panenRes.status === 'fulfilled' && panenRes.value.ok) {
-          const result = await panenRes.value.json();
+        if (panenRes.status === 'fulfilled' && panenRes.value.data) {
+          const result = panenRes.value.data;
           setPanenSummary(result.data || null);
         }
       } catch (error) {
